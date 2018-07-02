@@ -1,0 +1,37 @@
+# Copyright 2017 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ------------------------------------------------------------------------------
+
+version: "2.1"
+
+services:
+
+  poet-2-engine:
+    container_name: poet-2-engine
+    build:
+      context: ../../..
+      dockerfile: ./consensus/poet2/core/poet-2-engine.dockerfile
+      args:
+        - http_proxy
+        - https_proxy
+        - no_proxy
+    volumes:
+      - ../../..:/project/sawtooth-core/
+    working_dir: '/project/sawtooth-core/consensus/poet2/core'
+    entrypoint: "bash -c \"rm -rf /project/sawtooth-core/consensus/poet2/core/bin &&\
+	mkdir -p ./bin/ &&\
+	cd /project/sawtooth-core/consensus/poet2/core &&\ 
+	cargo build --release && cp ./target/release/poet2 ./bin/poet2 &&\	
+	cargo run --bin poet2 -- -C tcp://localhost:4004 && tail -f /dev/null \""
+    stop_signal: SIGKILL

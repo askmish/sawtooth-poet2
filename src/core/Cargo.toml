@@ -1,0 +1,14 @@
+[package]
+name = "poet2"
+version = "0.1.0"
+authors = ["Intel Corporation"]
+
+[dependencies]
+sawtooth_sdk = { path = "../../../sdk/rust" }
+rand = "0.4.2"
+log = "0.3.0"
+log4rs = "0.7.0"
+protobuf="2.0"
+zmq = { git = "https://github.com/erickt/rust-zmq", branch = "release/v0.8" }
+num = "*"
+clap = "~2.27.0"

@@ -17,15 +17,17 @@ version: "2.1"
 
 services:
 
-  unit-poet-2:
+  unit-poet2:
+    container_name: poet2-test
     build:
-      context: ../../..
-      dockerfile: ./consensus/poet2/core/poet-2-tests.dockerfile
+      context: ./
+      dockerfile: ./poet2-engine.dockerfile
       args:
         - http_proxy
         - https_proxy
         - no_proxy
     volumes:
-      - ../../../:/project/sawtooth-core
-    working_dir: /project/sawtooth-core/consensus/poet2/core
+      - ./:/project/sawtooth-poet2/
+    working_dir: '/project/sawtooth-poet2/src/core'
     command:  cargo test
+    stop_signal: SIGKILL

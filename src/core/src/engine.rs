@@ -16,6 +16,8 @@
  */
 
 extern crate sawtooth_sdk;
+extern crate log;
+extern crate log4rs;
  
 use sawtooth_sdk::consensus::{engine::*, service::Service};
 use service::Poet2Service;
@@ -24,23 +26,24 @@ use std::time;
 use std::str::FromStr;
 
 pub struct Poet2Engine {
-    exit: Exit,
 }
 
 impl Poet2Engine {
     pub fn new() -> Self {
-        Poet2Engine { exit: Exit::new() }
+        Poet2Engine {}
     }
 }
 
 impl Engine for Poet2Engine {
     fn start(
-        &self,
+        &mut self,
         updates: Receiver<Update>,
         service: Box<Service>,
         mut chain_head: Block,
         _peers: Vec<PeerInfo>,
     ) {
+    	
+    	info!("Started PoET 2 Engine");
         let mut service = Poet2Service::new(service);
 
         let mut wait_time = service.calculate_wait_time(chain_head.block_id.clone());
@@ -55,10 +58,6 @@ impl Engine for Poet2Engine {
         // 4. Check for publishing.
         loop {
             let incoming_message = updates.recv_timeout(time::Duration::from_millis(10));
-
-            if self.exit.get() {
-                break;
-            }
 
             match incoming_message {
                 Ok(update) => {
@@ -119,11 +118,11 @@ impl Engine for Poet2Engine {
                             service.initialize_block(None);
                         }
 
-                        Update::PeerMessage(message, sender_id) => match DevmodeMessage::from_str(
+                        Update::PeerMessage(message, sender_id) => match ResponseMessage::from_str(
                             message.message_type.as_ref(),
                         ).unwrap()
                         {
-                            DevmodeMessage::Published => {
+                            ResponseMessage::Published => {
                                 let block_id = BlockId::from(message.content);
                                 info!(
                                     "Received block published message from {:?}: {:?}",
@@ -131,7 +130,7 @@ impl Engine for Poet2Engine {
                                 );
                             }
 
-                            DevmodeMessage::Received => {
+                            ResponseMessage::Received => {
                                 let block_id = BlockId::from(message.content);
                                 info!(
                                     "Received block received message from {:?}: {:?}",
@@ -140,14 +139,13 @@ impl Engine for Poet2Engine {
                                 service.send_block_ack(sender_id, block_id);
                             }
 
-                            DevmodeMessage::Ack => {
+                            ResponseMessage::Ack => {
                                 let block_id = BlockId::from(message.content);
                                 info!("Received ack message from {:?}: {:?}", sender_id, block_id);
                             }
                         },
 
-                        // Devmode doesn't care about peer notifications
-                        // or invalid blocks.
+			//Ignoring invalid blocks for now 
                         _ => {}
                     }
                 }
@@ -170,10 +168,6 @@ impl Engine for Poet2Engine {
         }
     }
 
-    fn stop(&self) {
-        self.exit.set();
-    }
-
     fn version(&self) -> String {
         "2.0".into()
     }
@@ -184,31 +178,26 @@ impl Engine for Poet2Engine {
     
 }
 
-fn check_consensus(block: &Block) -> bool {
-    block.payload == create_consensus(&block.summary)
+fn check_consensus(_block: &Block) -> bool {
+	true
 }
 
-fn create_consensus(summary: &[u8]) -> Vec<u8> {
-    let mut consensus: Vec<u8> = Vec::from(&b"Devmode"[..]);
-    consensus.extend_from_slice(summary);
-    consensus
-}
-
-pub enum DevmodeMessage {
+pub enum ResponseMessage {
     Ack,
     Published,
     Received,
 }
 
-impl FromStr for DevmodeMessage {
+impl FromStr for ResponseMessage {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "ack" => Ok(DevmodeMessage::Ack),
-            "published" => Ok(DevmodeMessage::Published),
-            "received" => Ok(DevmodeMessage::Received),
+            "ack" => Ok(ResponseMessage::Ack),
+            "published" => Ok(ResponseMessage::Published),
+            "received" => Ok(ResponseMessage::Received),
             _ => Err("Invalid message type"),
         }
     }
 }
+

@@ -215,7 +215,7 @@ mod tests {
     use super::*;
     use std::default::Default;
     use zmq;
-    use sawtooth_sdk::consensus::{zmq_driver::ZmqService};
+    use sawtooth_sdk::consensus::{zmq_service::ZmqService};
 	use protobuf::{Message as ProtobufMessage};
 	use protobuf;
 	use sawtooth_sdk::messages::consensus::*;

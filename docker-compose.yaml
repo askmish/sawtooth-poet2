@@ -17,21 +17,21 @@ version: "2.1"
 
 services:
 
-  poet-2-engine:
-    container_name: poet-2-engine
+  poet2-engine:
+    container_name: poet2-engine
     build:
-      context: ../../..
-      dockerfile: ./consensus/poet2/core/poet-2-engine.dockerfile
+      context: ./
+      dockerfile: ./poet2-engine.dockerfile
       args:
         - http_proxy
         - https_proxy
         - no_proxy
     volumes:
-      - ../../..:/project/sawtooth-core/
-    working_dir: '/project/sawtooth-core/consensus/poet2/core'
-    entrypoint: "bash -c \"rm -rf /project/sawtooth-core/consensus/poet2/core/bin &&\
+      - ./:/project/sawtooth-poet2/
+    working_dir: '/project/sawtooth-poet2/src/core'
+    entrypoint: "bash -c \"rm -rf /project/sawtooth-poet2/src/core/bin &&\
 	mkdir -p ./bin/ &&\
-	cd /project/sawtooth-core/consensus/poet2/core &&\ 
+	cd /project/sawtooth-poet2/src/core &&\ 
 	cargo build --release && cp ./target/release/poet2 ./bin/poet2 &&\	
-	cargo run --bin poet2 -- -C tcp://localhost:4004 && tail -f /dev/null \""
+	cargo run --bin poet2 -- -C tcp://localhost:5005 && tail -f /dev/null \""
     stop_signal: SIGKILL

@@ -29,6 +29,7 @@ RUN echo "deb [arch=amd64] http://repo.sawtooth.me/ubuntu/ci xenial universe" >>
     pkg-config \
     python3-grpcio-tools=1.1.3-1 \
     unzip \
+    git \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 RUN \
@@ -59,5 +60,10 @@ ENV PATH=$PATH:/protoc3/bin:/project/sawtooth-core/bin:/root/.cargo/bin \
     CARGO_INCREMENTAL=0
 
 RUN rustup component add rustfmt-preview
+
+RUN mkdir -p /project/ \
+&& current_dir=`pwd` \
+&& cd /project \
+&& git clone -b master --single-branch https://github.com/hyperledger/sawtooth-core.git
 
 WORKDIR /

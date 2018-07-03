@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Intel Corporation"]
 
 [dependencies]
-sawtooth_sdk = { path = "../../../sdk/rust" }
+sawtooth_sdk = { path = "../../../sawtooth-core/sdk/rust" }
 rand = "0.4.2"
 log = "0.3.0"
 log4rs = "0.7.0"

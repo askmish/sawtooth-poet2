@@ -27,12 +27,10 @@ extern crate zmq;
 extern crate num;
 
 pub mod engine;
-pub mod driver;
 pub mod service;
 
 use engine::Poet2Engine;
-use driver::Poet2Driver;
-use sawtooth_sdk::consensus::{driver::Driver, zmq_driver::ZmqDriver};
+use sawtooth_sdk::consensus::{zmq_driver::ZmqDriver};
 
 use std::process;
 use log::LogLevelFilter;
@@ -81,9 +79,11 @@ fn main() {
         process::exit(1);
     });
     
-    let driver = ZmqDriver::new(Box::new(Poet2Engine::new()));
+    let (driver, _stop_handle) = ZmqDriver::new();
+	info!("Starting the ZMQ Driver.");
 	
-    driver.start(&endpoint).unwrap_or_else(|_err| {
+    driver.start(&endpoint, Poet2Engine::new()).unwrap_or_else(|_err| {
         process::exit(1);
     });
 }
+

@@ -39,13 +39,12 @@ impl Engine for Poet2Engine {
         &mut self,
         updates: Receiver<Update>,
         service: Box<Service>,
-        mut chain_head: Block,
-        _peers: Vec<PeerInfo>,
-    ) {
+	startup_state: StartupState, 
+   ) {
     	
     	info!("Started PoET 2 Engine");
         let mut service = Poet2Service::new(service);
-
+	let mut chain_head = startup_state.chain_head;
         let mut wait_time = service.calculate_wait_time(chain_head.block_id.clone());
         let mut published_at_height = false;
         let mut start = time::Instant::now();

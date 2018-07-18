@@ -22,14 +22,75 @@ use std::time::Instant;
 
 use rand;
 use rand::Rng;
+use log;
+use log4rs;
+use double;
+use std::collections::HashMap;
 
 const DEFAULT_WAIT_TIME: u64 = 0;
+
+mock_trait_no_default!(
+   MockServiceUT,
+   get_settings(BlockId, Vec<String>) -> Result<HashMap<String, String>, Error>,
+   summarize_block() -> Result<Vec<u8>, Error>,
+   finalize_block(Vec<u8>) -> Result<BlockId, Error>,
+   get_blocks(Vec<BlockId>) -> Result<HashMap<BlockId, Block>, Error>
+);
 
 pub struct Poet2Service {
     service: Box<Service>,
     init_wall_clock: Instant,
     chain_clock: u64,
 }
+
+impl Service for MockServiceUT {
+        fn send_to(
+            &mut self,
+            _peer: &PeerId,
+            _message_type: &str,
+            _payload: Vec<u8>,
+        ) -> Result<(), Error> {
+            Ok(())
+        }
+         fn broadcast(&mut self, _message_type: &str, _payload: Vec<u8>) -> Result<(), Error> {
+            Ok(())
+        }
+        fn initialize_block(&mut self, _previous_id: Option<BlockId>) -> Result<(), Error> {
+            Ok(())
+        }
+        mock_method!(summarize_block(&mut self) -> Result<Vec<u8>, Error>);
+        mock_method!(finalize_block(&mut self, _data: Vec<u8>) -> Result<BlockId, Error>);
+        fn cancel_block(&mut self) -> Result<(), Error> {
+            Ok(())
+        }
+        fn check_blocks(&mut self, _priority: Vec<BlockId>) -> Result<(), Error> {
+            Ok(())
+        }
+        fn commit_block(&mut self, _block_id: BlockId) -> Result<(), Error> {
+            Ok(())
+        }
+        fn ignore_block(&mut self, _block_id: BlockId) -> Result<(), Error> {
+            Ok(())
+        }
+        fn fail_block(&mut self, _block_id: BlockId) -> Result<(), Error> {
+            Ok(())
+        }
+        mock_method!(get_blocks(
+            &mut self,
+            _block_ids: Vec<BlockId>
+        ) -> Result<HashMap<BlockId, Block>, Error>);
+        fn get_chain_head(&mut self) -> Result<Block, Error> {
+            Ok(Default::default())
+        }
+        mock_method!(get_settings(&mut self, block_id: BlockId, keys: Vec<String>) -> Result<HashMap<String, String>, Error>);
+        fn get_state(
+            &mut self,
+            _block_id: BlockId,
+            _addresses: Vec<String>,
+        ) -> Result<HashMap<String, Vec<u8>>, Error> {
+            Ok(Default::default())
+        }
+ }
 
 impl Poet2Service {
        pub fn new(service_: Box<Service>) -> Self {
@@ -92,7 +153,6 @@ impl Poet2Service {
             sleep(time::Duration::from_secs(1));
             block_id = self.service.finalize_block(consensus.clone());
         }
-
         block_id.expect("Failed to finalize block")
     }
 
@@ -173,7 +233,6 @@ impl Poet2Service {
                 String::from("sawtooth.consensus.max_wait_time"),
             ],
         );
-
         let wait_time = if let Ok(settings) = settings_result {
             let ints: Vec<u64> = vec![
                 settings.get("sawtooth.consensus.min_wait_time").unwrap(),
@@ -216,17 +275,17 @@ mod tests {
     use std::default::Default;
     use zmq;
     use sawtooth_sdk::consensus::{zmq_service::ZmqService};
-	use protobuf::{Message as ProtobufMessage};
-	use protobuf;
-	use sawtooth_sdk::messages::consensus::*;
-	use sawtooth_sdk::messages::validator::{Message, Message_MessageType};
-	use sawtooth_sdk::messaging::zmq_stream::ZmqMessageConnection;
-	use sawtooth_sdk::messaging::stream::MessageConnection;
-	fn generate_correlation_id() -> String {
-	    const LENGTH: usize = 16;
-	    rand::thread_rng().gen_ascii_chars().take(LENGTH).collect()
-	}
-	fn send_req_rep<I: protobuf::Message, O: protobuf::Message>(
+    use protobuf::{Message as ProtobufMessage};
+    use protobuf;
+    use sawtooth_sdk::messages::consensus::*;
+    use sawtooth_sdk::messages::validator::{Message, Message_MessageType};
+    use sawtooth_sdk::messaging::zmq_stream::ZmqMessageConnection;
+    use sawtooth_sdk::messaging::stream::MessageConnection;
+    fn generate_correlation_id() -> String {
+        const LENGTH: usize = 16;
+	rand::thread_rng().gen_ascii_chars().take(LENGTH).collect()
+    }
+    fn send_req_rep<I: protobuf::Message, O: protobuf::Message>(
         connection_id: &[u8],
         socket: &zmq::Socket,
         request: I,
@@ -290,6 +349,123 @@ mod tests {
     }
 
     #[test]
+    fn test_get_blocks(){
+        let mut test_mock_str = HashMap::new();
+        test_mock_str.insert(String::from("test_min"), String::from("10"));
+        debug!("In Mocking get block");
+        let block_id_map = BlockId::from(vec![16,16,85,32]);
+        let blk: Block = Block{block_id: block_id_map.clone(), previous_id: block_id_map.clone(), signer_id: PeerId::from(vec![11,22,33,44]), block_num: 112, payload:vec![10,20], summary: vec![11,22,33,44] };
+        let mut test_block = HashMap::new();
+        test_block.insert(block_id_map.clone(), blk);
+        let test_result: Result<HashMap<BlockId, Block>, Error> = Ok(test_block.clone()); 
+        let cal_get_blocks = MockServiceUT::new(Ok(test_mock_str), Ok(vec![100,200]), Ok(BlockId::from(vec![78,39])), Ok(test_block) );
+        cal_get_blocks.get_blocks.return_value(test_result);
+        let mut svc = Poet2Service::new( Box::new(cal_get_blocks));
+        let get_blocks_res = svc.get_block(block_id_map.clone());
+        assert_eq!(get_blocks_res.block_num, 112);
+    }
+
+    #[test]
+    fn test_summarize_block(){
+        let mut test_mock_str = HashMap::new();
+        test_mock_str.insert(String::from("test_min"), String::from("10"));
+        debug!("In Mocking Summarize block");
+        let mut v: Vec<u8> = vec![99,99,99];
+        let mut test_res: Result<Vec<u8>, Error> = Ok(v);
+        let test_block_id = BlockId::from(vec![78,39]);
+        let blk: Block = Block{block_id: BlockId::from(vec![11,22]), previous_id: BlockId::from(vec![11,12]), signer_id: PeerId::from(vec![11,25]), block_num: 112, payload:vec![67,23], summary: vec![45,76] };
+        let mut test_block = HashMap::new();
+        test_block.insert(test_block_id, blk);
+        let cal_summarize = MockServiceUT::new(Ok(test_mock_str), test_res.clone(), Ok(BlockId::from(vec![99,99,99])), Ok(test_block));
+        cal_summarize.summarize_block.return_value(test_res);
+        let mut svc = Poet2Service::new( Box::new(cal_summarize));
+        let mut summarize_block_res = svc.finalize_block();
+        assert_eq!(summarize_block_res, BlockId::from(vec![99,99,99]));
+    }
+
+    #[test]
+    fn test_cal_wait_time_min_lessthan_maxtime(){
+        let mut test_mock_str = HashMap::new();
+        let mut str1 = String::from("300");
+        let mut str2 = String::from("500");
+        test_mock_str.insert(String::from("sawtooth.consensus.min_wait_time"), str1.clone());
+        test_mock_str.insert(String::from("sawtooth.consensus.max_wait_time"), str2.clone());
+        let test_result: Result<HashMap<String, String>, Error> = Ok(test_mock_str.clone());
+     	let test_block_id = BlockId::from(vec![78,39]);
+        let blk: Block = Block{block_id: BlockId::from(vec![11,22]), previous_id: BlockId::from(vec![11,12]), signer_id: PeerId::from(vec![11,25]), block_num: 112, payload:vec![67,23], summary: vec![45,76] };
+        let mut test_block = HashMap::new();
+        test_block.insert(test_block_id, blk);
+
+        let cal_time = MockServiceUT::new(Ok(test_mock_str), Ok(vec![100,200]), Ok(BlockId::from(vec![78,39])), Ok(test_block));
+        cal_time.get_settings.return_value(test_result);
+        let mut svc = Poet2Service::new( Box::new(cal_time));
+        let mut wt = svc.calculate_wait_time(Default::default()).as_secs();
+        let mut min_time = str1.parse::<u64>().unwrap();
+        let mut max_time = str2.parse::<u64>().unwrap();
+        if wt > min_time && wt < max_time{
+            assert_gt!(wt, min_time);
+            assert_lt!(wt, max_time);
+        }
+    }
+	
+    #[test]
+    fn test_cal_wait_time_null_values(){
+        let mut test_mock_str = HashMap::new();
+        let mut str1 = String::from(" ");
+        let mut str2 = String::from(" ");
+        test_mock_str.insert(String::from("sawtooth.consensus.min_wait_time"), str1.clone());
+        test_mock_str.insert(String::from("sawtooth.consensus.max_wait_time"), str2.clone());
+        let test_result: Result<HashMap<String, String>, Error> = Ok(test_mock_str.clone());
+     	let test_block_id = BlockId::from(vec![78,39]);
+        let blk: Block = Block{block_id: BlockId::from(vec![11,22]), previous_id: BlockId::from(vec![11,12]), signer_id: PeerId::from(vec![11,25]), block_num: 112, payload:vec![67,23], summary: vec![45,76] };
+        let mut test_block = HashMap::new();
+        test_block.insert(test_block_id, blk);
+
+        let cal_time = MockServiceUT::new(Ok(test_mock_str), Ok(vec![100,200]), Ok(BlockId::from(vec![78,39])), Ok(test_block));
+        cal_time.get_settings.return_value(test_result);
+        let mut svc = Poet2Service::new( Box::new(cal_time));
+        let mut wt = svc.calculate_wait_time(Default::default()).as_secs();
+        assert_eq!(wt, DEFAULT_WAIT_TIME);
+    }
+
+    #[test]
+    fn test_cal_wait_time_min_greaterthan_maxtime(){
+        let mut test_mock_str = HashMap::new();
+        let mut str1 = String::from("5000");
+        let mut str2 = String::from("100");
+        test_mock_str.insert(String::from("sawtooth.consensus.min_wait_time"), str1.clone());
+        test_mock_str.insert(String::from("sawtooth.consensus.max_wait_time"), str2.clone());
+        let test_result: Result<HashMap<String, String>, Error> = Ok(test_mock_str.clone());
+     	let test_block_id = BlockId::from(vec![78,39]);
+        let blk: Block = Block{block_id: BlockId::from(vec![11,22]), previous_id: BlockId::from(vec![11,12]), signer_id: PeerId::from(vec![11,25]), block_num: 112, payload:vec![67,23], summary: vec![45,76] };
+        let mut test_block = HashMap::new();
+        test_block.insert(test_block_id, blk);
+        let cal_time = MockServiceUT::new(Ok(test_mock_str), Ok(vec![100,200]), Ok(BlockId::from(vec![78,39])), Ok(test_block));
+        cal_time.get_settings.return_value(test_result);
+        let mut svc = Poet2Service::new( Box::new(cal_time));
+        let mut wt = svc.calculate_wait_time(Default::default()).as_secs();
+        assert_eq!(wt, DEFAULT_WAIT_TIME);   
+    }
+	
+    #[test]
+    fn test_finalize_block(){
+        let mut test_mock_str = HashMap::new();
+        test_mock_str.insert(String::from("test_min"), String::from("10"));
+        let mut v: Vec<u8> = vec![99,99,99];
+        let finalize_block_id = BlockId::from(v);
+        let mut finalize_blockId_res: Result<BlockId, Error> = Ok(finalize_block_id);
+	let test_block_id = BlockId::from(vec![78,39]);
+        let blk: Block = Block{block_id: BlockId::from(vec![11,22]), previous_id: BlockId::from(vec![11,12]), signer_id: PeerId::from(vec![11,25]), block_num: 112, payload:vec![67,23], summary: vec![45,76] };
+        let mut test_block = HashMap::new();
+        test_block.insert(test_block_id, blk);
+        let cal_finalize = MockServiceUT::new(Ok(test_mock_str), Ok(vec![100,200]), finalize_blockId_res.clone(), Ok(test_block));
+        cal_finalize.finalize_block.return_value(finalize_blockId_res);
+        let mut svc = Poet2Service::new( Box::new(cal_finalize));
+        let finalize_blk = svc.finalize_block();
+        assert_eq!(finalize_blk, BlockId::from(vec![99,99,99]));
+    }
+	
+    #[test]
     fn test_service() {
         let ctx = zmq::Context::new();
         let socket = ctx.socket(zmq::ROUTER).expect("Failed to create context");
@@ -312,20 +488,8 @@ mod tests {
             let mut svc = Poet2Service::new( Box::new(zmq_svc) );
             
             svc.initialize_block(Some(Default::default()));
-            /*svc.finalize_block();
-            svc.cancel_block();
-			svc.get_block(Default::default());
-            svc.get_chain_head();
-            svc.check_block(Default::default());
-            svc.commit_block(Default::default());
-            svc.ignore_block(Default::default());
-            svc.fail_block(Default::default());
-			svc.broadcast(Default::default());
-			assert_eq!(2, 2);
-            */
-			//assert_eq!(2, 3);
-		});
-		service_test!(
+	});
+	service_test!(
             &socket,
             ConsensusInitializeBlockResponse::new(),
             ConsensusInitializeBlockResponse_Status::OK,
@@ -333,10 +497,5 @@ mod tests {
             ConsensusInitializeBlockRequest,
             Message_MessageType::CONSENSUS_INITIALIZE_BLOCK_REQUEST
         );
-    }
-    
-    #[test]
-    fn test_dummy() {
-    	assert_eq!(4, 2+2);
     }
 }

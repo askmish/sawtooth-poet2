@@ -17,6 +17,10 @@
 
 extern crate sawtooth_sdk;
 #[macro_use]
+extern crate double;
+#[macro_use]
+extern crate more_asserts;
+#[macro_use]
 extern crate clap;
 #[macro_use]
 extern crate log;

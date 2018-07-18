@@ -12,3 +12,5 @@ protobuf="2.0"
 zmq = { git = "https://github.com/erickt/rust-zmq", branch = "release/v0.8" }
 num = "*"
 clap = "~2.27.0"
+double = "0.2.2"
+more-asserts = "0.2.1"

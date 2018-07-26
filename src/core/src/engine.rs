@@ -34,17 +34,19 @@ impl Poet2Engine {
     }
 }
 
+static mut CLAIM_BLOCK : Option<Block> = None;
+
 impl Engine for Poet2Engine {
     fn start(
         &mut self,
         updates: Receiver<Update>,
         service: Box<Service>,
-	startup_state: StartupState, 
+  startup_state: StartupState, 
    ) {
-    	
-    	info!("Started PoET 2 Engine");
+        
+        info!("Started PoET 2 Engine");
         let mut service = Poet2Service::new(service);
-	let mut chain_head = startup_state.chain_head;
+        let chain_head = startup_state.chain_head;
         let mut wait_time = service.calculate_wait_time(chain_head.block_id.clone());
         let mut published_at_height = false;
         let mut start = time::Instant::now();
@@ -68,37 +70,143 @@ impl Engine for Poet2Engine {
 
                             if check_consensus(&block) {
                                 info!("Passed consensus check: {:?}", block);
-                                service.check_block(block.block_id);
+                                service.check_block(block.clone().block_id);
+                                // Retain the block in static scope here for 
+                                // checks during fork resolution
+                                unsafe {
+                                    CLAIM_BLOCK = Some(block.clone());
+                                }
                             } else {
                                 info!("Failed consensus check: {:?}", block);
                                 service.fail_block(block.block_id);
                             }
-                        }
+                        },
 
                         Update::BlockValid(block_id) => {
-                            let block = service.get_block(block_id.clone());
+                            let block_ = service.get_block(block_id.clone());
 
-                            service.send_block_received(&block);
+                            /*if block_.is_ok(){
 
-                            chain_head = service.get_chain_head();
+                                let block = block_.unwrap();
+                                service.send_block_received(&block);
 
-                            info!(
-                                "Choosing between chain heads -- current: {:?} -- new: {:?}",
-                                chain_head, block
-                            );
+                                chain_head = service.get_chain_head();
+                                let mut prev_block_ = service.get_block(block.previous_id.clone());
 
-                            // Advance the chain if possible.
-                            if block.block_num > chain_head.block_num
-                                || (block.block_num == chain_head.block_num
-                                    && block.block_id > chain_head.block_id)
-                            {
-                                info!("Committing {:?}", block);
-                                service.commit_block(block_id);
-                            } else {
-                                info!("Ignoring {:?}", block);
-                                service.ignore_block(block_id);
-                            }
-                        }
+                                info!(
+                                    "Choosing between chain heads -- current: {:?} -- new: {:?}",
+                                    chain_head, block
+                                );
+
+                                // Commiting or Resolving fork if one exists
+                                // Advance the chain if possible.
+                                let mut claim_block:Option<Block> = None;
+                                unsafe {
+                                    claim_block = CLAIM_BLOCK.clone();
+                                }
+                                let claim_block_dur:Vec<u8> = claim_block.wait_cert.duration;
+                
+                
+                                // Current block points to current head
+                                // Check if block already claimed. Go on to
+                                // compare duration then. Accept one of them
+                                // and update it to be new chain head
+                                if block.block_num == 1+chain_head.block_num
+                                      && block.previous_id == chain_head.block_id {
+
+                                    let mut new_block_dur:Vec<u8> = block.wait_cert.dur;
+
+                                    if new_block_dur < claim_block_dur{
+                                        info!("Discarding the block in progress.");
+                                        service.cancel_block();
+                                        info!("New block extends current chain. Committing {:?}", block);
+                                        service.commit_block(block_id);
+                                    }
+                                    else {
+                                        info!("New block has larger duration. Failing {:?}", block);
+                                        service.fail_block(block_id);
+                                    }
+                                }
+
+                                // Check if the previous block is strictly in the
+                                // cache. If so, look for common ancestor and resolve fork.
+                                else if prev_block_.is_ok()
+                                            && state_store.get(vec![prev_block_.unwrap().block_id.clone()]) == None {
+
+                                    let prev_block = prev_block_.unwrap();
+                                    let mut cache_block = block;
+                                    let mut block_state;
+                                    let mut head_cc = state_store.get(vec![chain_head.block_id.clone()]).cc;
+                                    let mut fork_cc:u64 = cache_block.wait_cert.cc;
+                                    let mut fork_len:u64 = 1;
+                                    let mut ancestor_found:bool = false;
+
+                                    loop {
+                                        let mut cache_block_ = service.get_block(cache_block.previous_id.clone());
+                                        // If block's previous not in cache or blockstore,
+                                        // break from loop and send block to cache
+                                        if cache_block_.is_ok() {
+
+                                            let cache_block = cache_block_.unwrap();
+                                            fork_cc += cache_block.cc; // get cc from certificate in cache_block
+                                            // Assuming here that we have the consensus state
+                                            // for each block that has been committed into the chain.
+                                            // Parse blocks from cache & states from the statestore
+                                            // to find a common ancestor.
+                                            // Keep account of the chainclocks from cache.
+                                            // Once common ancestor is found, compare the
+                                            // chainclocks of the forks to choose a fork
+                                            block_state = state_store.get(vec![cache_block.block_id.clone()]);
+                                            if block_state.is_ok() {
+                                                    // Found common ancestor
+                                                    info!("Found a common ancestor at block {:?}",block);
+                                                    ancestor_found = true;
+                                                    break;
+                                            }
+                                            fork_len += 1;
+                                        }
+                                        else {
+                                            info!("Not a valid fork.");
+                                        }
+                                    }
+                                    let mut fork_won = false;
+                                    let mut chain_cc:u64 = 0;
+                                    if ancestor_found {
+                                        let mut ancestor_cc = block_state.wait_cert.cc;
+                                        chain_cc = head_cc - ancestor_cc;
+                                        let mut chain_len:u64 = chain_head.block_num - cache_block.block_num;
+                                        if chain_len > fork_len {
+                                            fork_won = false;
+                                        }
+                                         else if chain_len < fork_len {
+                                            fork_won = true;
+                                        }
+                                    }
+                                    // Fork lengths are equal
+                                    else {
+                                        if chain_cc == fork_cc {
+                                            fork_won = if block.wait_cert.duration <  chain_head.wait_cert.duration
+                                                        { true } else { false };
+                                        }
+                                        else {
+                                            fork_won = if fork_cc < chain_cc { true } else { false };
+                                        }
+                                    }
+                                    if fork_won {
+                                        info!("Switching to fork.");
+                                        service.commit_block(block_id);
+                                        // Mark all blocks upto common ancestor
+                                        // in the chain as invalid.
+                                    }
+                                    else {
+                                        info!("Not switching to fork");
+                                        service.ignore_block(block.block_id.clone());
+                                    }
+
+                                }
+                            }*/
+                            // Fork Resolution done
+                        },
 
                         // The chain head was updated, so abandon the
                         // block in progress and start a new one.
@@ -113,9 +221,11 @@ impl Engine for Poet2Engine {
                             wait_time = service.calculate_wait_time(new_chain_head.clone());
                             published_at_height = false;
                             start = time::Instant::now();
-
+                            unsafe {
+                                    CLAIM_BLOCK = None;
+                            }
                             service.initialize_block(None);
-                        }
+                        },
 
                         Update::PeerMessage(message, sender_id) => match ResponseMessage::from_str(
                             message.message_type.as_ref(),
@@ -144,7 +254,9 @@ impl Engine for Poet2Engine {
                             }
                         },
 
-			//Ignoring invalid blocks for now 
+                        Update::BlockInvalid(block_id) => {
+                            info!("Invalid block received with block id : {:?}", block_id);
+                        },
                         _ => {}
                     }
                 }
@@ -177,8 +289,26 @@ impl Engine for Poet2Engine {
     
 }
 
+/*
+* Consensus related sanity checks to be done here
+* If all checks pass but WC < CC, forced sleep is
+* induced to sync up the clocks. Sleep duration
+* in that case would be atleast CC - WC.
+* 
+* 
+* 
+* 
+* 
+* 
+* 
+* 
+* 
+* 
+* 
+*/
+
 fn check_consensus(_block: &Block) -> bool {
-	true
+    true
 }
 
 pub enum ResponseMessage {
@@ -199,4 +329,3 @@ impl FromStr for ResponseMessage {
         }
     }
 }
-

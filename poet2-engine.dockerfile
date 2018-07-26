@@ -61,9 +61,4 @@ ENV PATH=$PATH:/protoc3/bin:/project/sawtooth-core/bin:/root/.cargo/bin \
 
 RUN rustup component add rustfmt-preview
 
-RUN mkdir -p /project/ \
-&& current_dir=`pwd` \
-&& cd /project \
-&& git clone -b master --single-branch https://github.com/hyperledger/sawtooth-core.git
-
 WORKDIR /

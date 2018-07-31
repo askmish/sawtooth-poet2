@@ -24,6 +24,7 @@ use service::Poet2Service;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time;
 use std::str::FromStr;
+use serde_json::from_str;
 
 pub struct Poet2Engine {
 }
@@ -46,7 +47,7 @@ impl Engine for Poet2Engine {
         
         info!("Started PoET 2 Engine");
         let mut service = Poet2Service::new(service);
-        let chain_head = startup_state.chain_head;
+        let mut chain_head = startup_state.chain_head;
         let mut wait_time = service.calculate_wait_time(chain_head.block_id.clone());
         let mut published_at_height = false;
         let mut start = time::Instant::now();
@@ -68,7 +69,7 @@ impl Engine for Poet2Engine {
                         Update::BlockNew(block) => {
                             info!("Checking consensus data: {:?}", block);
 
-                            if check_consensus(&block) {
+                            if check_consensus(block.clone(), &mut service) {
                                 info!("Passed consensus check: {:?}", block);
                                 service.check_block(block.clone().block_id);
                                 // Retain the block in static scope here for 
@@ -85,6 +86,30 @@ impl Engine for Poet2Engine {
                         Update::BlockValid(block_id) => {
                             let block_ = service.get_block(block_id.clone());
 
+                            if block_.is_ok(){
+
+                                let block = block_.unwrap();
+                                service.send_block_received(&block);
+
+                                chain_head = service.get_chain_head();
+
+                                info!(
+                                    "Choosing between chain heads -- current: {:?} -- new: {:?}",
+                                    chain_head, block
+                                );
+
+                                // Advance the chain if possible.
+                                if block.block_num > chain_head.block_num
+                                    || (block.block_num == chain_head.block_num
+                                        && block.block_id > chain_head.block_id)
+                                {
+                                    info!("Committing {:?}", block);
+                                    service.commit_block(block_id);
+                                } else {
+                                    info!("Ignoring {:?}", block);
+                                    service.ignore_block(block_id);
+                                }
+                           }
                             /*if block_.is_ok(){
 
                                 let block = block_.unwrap();
@@ -307,9 +332,55 @@ impl Engine for Poet2Engine {
 * 
 */
 
-fn check_consensus(_block: &Block) -> bool {
+fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
+    // 1. Validator registry check
+    // 3. k-test
+    // 4. Match Local Mean against the locally computed
+    // 5. Verfidy BlockDigest is a valid ECDSA of
+    //    SHA256 hash of block using OPK
+    // 6. z-test
+    // 7. c-test
+
+    //\\ 2. Signature validation using sender's PPK
+    if !verify_wait_certificate(block){
+        return false;
+    }
+
+    //\\ 8. Compare CC & WC
+    let chain_clock = service.get_chain_clock();
+    let wall_clock = service.get_wall_clock();
+    let wait_time:u64 = 0;//get_wait_cert_json(String::from_utf8(block.payload).unwrap()).wait_time;
+    if chain_clock + wait_time > wall_clock {
+        return false;
+    }
     true
 }
+
+fn verify_wait_certificate( _block: Block) -> bool{
+    true
+}
+
+/*
+fn get_wait_cert_json(cert_str:String) -> WaitCertificate {
+
+    let wait_cert: WaitCertificate = from_str(&cert_str).unwrap();
+    wait_cert
+
+}
+// Stubbed placeholder
+#[derive(Serialize, Deserialize)]
+struct WaitCertificate {
+durationId : [u8; 32],
+wait_time :  u64,
+localMean : f64,
+blockId : u64,
+prevBlockId : u64,
+blockHash : [u8; 32],
+blockNumber : u64,
+validatorId : [u8; 32],
+sign : [u8; 64],
+}
+*/
 
 pub enum ResponseMessage {
     Ack,

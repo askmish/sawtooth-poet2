@@ -60,13 +60,21 @@ impl Poet2Service {
             .expect("Failed to get chain head")
     }
 
-    pub fn get_block(&mut self, block_id: BlockId) -> Block {
+    pub fn get_block(&mut self, block_id: BlockId) -> Result<Block, Error> {
         debug!("Getting block {:?}", block_id);
-        self.service
+        let block = self.service
             .get_blocks(vec![block_id.clone()])
             .expect("Failed to get block")
-            .remove(&block_id) //remove from the returned hashmap to get value 
-            .unwrap()
+            .remove(&block_id); //remove from the returned hashmap to get value
+        match block {
+            None => {
+                debug!("Could not get a block with id {:?}", block_id.clone());
+                Err(Error::UnknownBlock(format!("Block not found for id {:?}", block_id.clone())))
+            }
+            Some(b) => {
+                Ok(b)
+            }
+        }
     }
 
     pub fn initialize_block(&mut self, previous_id: Option<BlockId>) {
@@ -312,18 +320,6 @@ mod tests {
             let mut svc = Poet2Service::new( Box::new(zmq_svc) );
             
             svc.initialize_block(Some(Default::default()));
-            /*svc.finalize_block();
-            svc.cancel_block();
-			svc.get_block(Default::default());
-            svc.get_chain_head();
-            svc.check_block(Default::default());
-            svc.commit_block(Default::default());
-            svc.ignore_block(Default::default());
-            svc.fail_block(Default::default());
-			svc.broadcast(Default::default());
-			assert_eq!(2, 2);
-            */
-			//assert_eq!(2, 3);
 		});
 		service_test!(
             &socket,

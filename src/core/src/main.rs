@@ -14,20 +14,26 @@
  * limitations under the License.
  * ------------------------------------------------------------------------------
  */
-
-extern crate sawtooth_sdk;
 #[macro_use]
 extern crate clap;
+extern crate serde;
+extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate log4rs;
-extern crate rand;
-extern crate protobuf;
-extern crate zmq;
 extern crate num;
+extern crate protobuf;
+extern crate rand;
+extern crate sawtooth_sdk;
+extern crate zmq;
 
 pub mod engine;
 pub mod service;
+pub mod enclave_sim;
 
 use engine::Poet2Engine;
 use sawtooth_sdk::consensus::{zmq_driver::ZmqDriver};

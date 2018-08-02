@@ -34,25 +34,25 @@ pub struct Poet2Service {
 impl Poet2Service {
        pub fn new(service_: Box<Service>) -> Self {
         let now = Instant::now();
-        Poet2Service { 
-        	service : service_, 
-        	init_wall_clock : now,
-        	chain_clock : 0,
+        Poet2Service {
+            service : service_,
+            init_wall_clock : now,
+            chain_clock : 0,
         }
     }
-	
-	pub fn get_chain_clock(&mut self) -> u64 {
-		self.chain_clock
-	}
-	
-	pub fn get_wall_clock(&mut self) -> u64 {
-		self.init_wall_clock.elapsed().as_secs()
-	}
-	
-	pub fn set_chain_clock(&mut self, new_cc : u64) {
-		self.chain_clock = new_cc;
-	}
-	
+
+    pub fn get_chain_clock(&mut self) -> u64 {
+        self.chain_clock
+    }
+
+    pub fn get_wall_clock(&mut self) -> u64 {
+        self.init_wall_clock.elapsed().as_secs()
+    }
+
+    pub fn set_chain_clock(&mut self, new_cc : u64) {
+        self.chain_clock = new_cc;
+    }
+
     pub fn get_chain_head(&mut self) -> Block {
         debug!("Getting chain head");
         self.service
@@ -60,13 +60,21 @@ impl Poet2Service {
             .expect("Failed to get chain head")
     }
 
-    pub fn get_block(&mut self, block_id: BlockId) -> Block {
+    pub fn get_block(&mut self, block_id: BlockId) -> Result<Block, Error> {
         debug!("Getting block {:?}", block_id);
-        self.service
+        let block = self.service
             .get_blocks(vec![block_id.clone()])
             .expect("Failed to get block")
-            .remove(&block_id) //remove from the returned hashmap to get value 
-            .unwrap()
+            .remove(&block_id); //remove from the returned hashmap to get value
+        match block {
+            None => {
+                debug!("Could not get a block with id {:?}", block_id.clone());
+                Err(Error::UnknownBlock(format!("Block not found for id {:?}", block_id.clone())))
+            }
+            Some(b) => {
+                Ok(b)
+            }
+        }
     }
 
     pub fn initialize_block(&mut self, previous_id: Option<BlockId>) {
@@ -85,12 +93,12 @@ impl Poet2Service {
             summary = self.service.summarize_block();
         }
 
-        let consensus: Vec<u8> = create_consensus(&summary.expect("Failed to summarize block"));
-        let mut block_id = self.service.finalize_block(consensus.clone());
+        let consensus_data: Vec<u8> = create_consensus_data(&summary.expect("Failed to summarize block"));
+        let mut block_id = self.service.finalize_block(consensus_data.clone());
         while let Err(Error::BlockNotReady) = block_id {
             warn!("Block not ready to finalize");
             sleep(time::Duration::from_secs(1));
-            block_id = self.service.finalize_block(consensus.clone());
+            block_id = self.service.finalize_block(consensus_data.clone());
         }
 
         block_id.expect("Failed to finalize block")
@@ -203,10 +211,10 @@ impl Poet2Service {
     }
 }
 
-fn create_consensus(summary: &[u8]) -> Vec<u8> {
-    let mut consensus: Vec<u8> = Vec::from(&b"Devmode"[..]);
-    consensus.extend_from_slice(summary);
-    consensus
+fn create_consensus_data(summary: &[u8]) -> Vec<u8> {
+    let mut consensus_data: Vec<u8> = Vec::from(&b"PoET2_Consensus"[..]);
+    consensus_data.extend_from_slice(summary);
+    consensus_data
 }
 
 
@@ -216,17 +224,17 @@ mod tests {
     use std::default::Default;
     use zmq;
     use sawtooth_sdk::consensus::{zmq_service::ZmqService};
-	use protobuf::{Message as ProtobufMessage};
-	use protobuf;
-	use sawtooth_sdk::messages::consensus::*;
-	use sawtooth_sdk::messages::validator::{Message, Message_MessageType};
-	use sawtooth_sdk::messaging::zmq_stream::ZmqMessageConnection;
-	use sawtooth_sdk::messaging::stream::MessageConnection;
-	fn generate_correlation_id() -> String {
-	    const LENGTH: usize = 16;
-	    rand::thread_rng().gen_ascii_chars().take(LENGTH).collect()
-	}
-	fn send_req_rep<I: protobuf::Message, O: protobuf::Message>(
+    use protobuf::{Message as ProtobufMessage};
+    use protobuf;
+    use sawtooth_sdk::messages::consensus::*;
+    use sawtooth_sdk::messages::validator::{Message, Message_MessageType};
+    use sawtooth_sdk::messaging::zmq_stream::ZmqMessageConnection;
+    use sawtooth_sdk::messaging::stream::MessageConnection;
+    fn generate_correlation_id() -> String {
+        const LENGTH: usize = 16;
+        rand::thread_rng().gen_ascii_chars().take(LENGTH).collect()
+    }
+    fn send_req_rep<I: protobuf::Message, O: protobuf::Message>(
         connection_id: &[u8],
         socket: &zmq::Socket,
         request: I,
@@ -273,7 +281,7 @@ mod tests {
         (connection_id, request)
     }
 
-	macro_rules! service_test {
+    macro_rules! service_test {
         (
             $socket:expr,
             $rep:expr,
@@ -307,25 +315,24 @@ mod tests {
                 "mock".into(),
                 "0".into(),
             );
-            
-                
+
             let mut svc = Poet2Service::new( Box::new(zmq_svc) );
-            
+
             svc.initialize_block(Some(Default::default()));
             /*svc.finalize_block();
             svc.cancel_block();
-			svc.get_block(Default::default());
+            svc.get_block(Default::default());
             svc.get_chain_head();
             svc.check_block(Default::default());
             svc.commit_block(Default::default());
             svc.ignore_block(Default::default());
             svc.fail_block(Default::default());
-			svc.broadcast(Default::default());
-			assert_eq!(2, 2);
+            svc.broadcast(Default::default());
+            assert_eq!(2, 2);
             */
-			//assert_eq!(2, 3);
-		});
-		service_test!(
+            //assert_eq!(2, 3);
+        });
+        service_test!(
             &socket,
             ConsensusInitializeBlockResponse::new(),
             ConsensusInitializeBlockResponse_Status::OK,
@@ -334,9 +341,9 @@ mod tests {
             Message_MessageType::CONSENSUS_INITIALIZE_BLOCK_REQUEST
         );
     }
-    
+
     #[test]
     fn test_dummy() {
-    	assert_eq!(4, 2+2);
+        assert_eq!(4, 2+2);
     }
 }

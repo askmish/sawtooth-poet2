@@ -24,7 +24,12 @@ use service::Poet2Service;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time;
 use std::str::FromStr;
+use std::cmp;
 use serde_json::from_str;
+use enclave_sim::WaitCertificate;
+
+
+const DEFAULT_BLOCK_CLAIM_LIMIT:i32 = 250;
 
 pub struct Poet2Engine {
 }
@@ -60,7 +65,6 @@ impl Engine for Poet2Engine {
         // 4. Check for publishing.
         loop {
             let incoming_message = updates.recv_timeout(time::Duration::from_millis(10));
-
             match incoming_message {
                 Ok(update) => {
                     debug!("Received message: {:?}", update);
@@ -324,7 +328,6 @@ impl Engine for Poet2Engine {
 
 fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
     // 1. Validator registry check
-    // 3. k-test
     // 4. Match Local Mean against the locally computed
     // 5. Verfidy BlockDigest is a valid ECDSA of
     //    SHA256 hash of block using OPK
@@ -336,6 +339,10 @@ fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
         return false;
     }
 
+    // 3. k-test
+    if validtor_has_claimed_block_limit( service ) {
+        return false;
+    }
     //\\ 8. Compare CC & WC
     let chain_clock = service.get_chain_clock();
     let wall_clock = service.get_wall_clock();
@@ -348,6 +355,36 @@ fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
 
 fn verify_wait_certificate( _block: Block) -> bool{
     true
+}
+
+
+//k-test
+fn validtor_has_claimed_block_limit( service: &mut Poet2Service ) -> bool {
+
+    let mut block_claim_limit = DEFAULT_BLOCK_CLAIM_LIMIT;
+    let mut key_block_claim_count=9;
+    let mut    poet_public_key="abcd";
+    let mut    validator_info_signup_info_poet_public_key="abcd";
+    //  let mut key_block_claim_limit = poet_settings_view.key_block_claim_limit ;     //key
+    // need to use get_settings from service
+    let key_block_claim_limit = service.get_setting_from_head(
+        String::from("sawtooth.poet.key_block_claim_limit"));
+
+    if key_block_claim_limit != "" {
+        block_claim_limit = key_block_claim_limit.parse::<i32>().unwrap();
+    }
+
+    // let mut validator_state = self.get_validator_state(); //                         //stubbed
+    //if validator_state.poet_public_key == validator_info.signup_info.poet_public_key //stubbed
+
+    if poet_public_key == validator_info_signup_info_poet_public_key     //stubbed function replaced with dummy function
+    {
+        //if validator_state.key_block_claim_count >= block_claim_limit
+        if key_block_claim_count >= block_claim_limit{
+            true }
+        else { false }
+    }
+    else{ false }
 }
 
 pub enum ResponseMessage {
@@ -368,3 +405,4 @@ impl FromStr for ResponseMessage {
         }
     }
 }
+

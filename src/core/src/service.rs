@@ -35,24 +35,24 @@ impl Poet2Service {
        pub fn new(service_: Box<Service>) -> Self {
         let now = Instant::now();
         Poet2Service { 
-        	service : service_, 
-        	init_wall_clock : now,
-        	chain_clock : 0,
+            service : service_,
+            init_wall_clock : now,
+            chain_clock : 0,
         }
     }
-	
-	pub fn get_chain_clock(&mut self) -> u64 {
-		self.chain_clock
-	}
-	
-	pub fn get_wall_clock(&mut self) -> u64 {
-		self.init_wall_clock.elapsed().as_secs()
-	}
-	
-	pub fn set_chain_clock(&mut self, new_cc : u64) {
-		self.chain_clock = new_cc;
-	}
-	
+
+    pub fn get_chain_clock(&mut self) -> u64 {
+        self.chain_clock
+    }
+
+    pub fn get_wall_clock(&mut self) -> u64 {
+        self.init_wall_clock.elapsed().as_secs()
+    }
+
+    pub fn set_chain_clock(&mut self, new_cc : u64) {
+        self.chain_clock = new_cc;
+    }
+
     pub fn get_chain_head(&mut self) -> Block {
         debug!("Getting chain head");
         self.service
@@ -209,10 +209,33 @@ impl Poet2Service {
 
         time::Duration::from_secs(wait_time)
     }
+
+    pub fn get_setting(&mut self, block_id: BlockId, key:String) -> String {
+        let settings_result = self.service.get_settings(
+            block_id,
+            vec![
+                    key.clone(),
+                ],
+        );
+
+        if settings_result.is_ok() {
+            settings_result.unwrap().remove(&key).unwrap()
+        }
+        else {
+            error!("Could not get setting for key {}", key);
+            String::from("")
+        }
+    }
+
+    pub fn get_setting_from_head(&mut self, key:String) ->  String {
+
+        let mut head_id:BlockId = self.get_chain_head().block_id;
+        self.get_setting( head_id, key )
+    }
 }
 
 fn create_consensus(summary: &[u8]) -> Vec<u8> {
-    let mut consensus: Vec<u8> = Vec::from(&b"Devmode"[..]);
+    let mut consensus: Vec<u8> = Vec::from(&b"PoET2_Consensus"[..]);
     consensus.extend_from_slice(summary);
     consensus
 }
@@ -224,17 +247,17 @@ mod tests {
     use std::default::Default;
     use zmq;
     use sawtooth_sdk::consensus::{zmq_service::ZmqService};
-	use protobuf::{Message as ProtobufMessage};
-	use protobuf;
-	use sawtooth_sdk::messages::consensus::*;
-	use sawtooth_sdk::messages::validator::{Message, Message_MessageType};
-	use sawtooth_sdk::messaging::zmq_stream::ZmqMessageConnection;
-	use sawtooth_sdk::messaging::stream::MessageConnection;
-	fn generate_correlation_id() -> String {
-	    const LENGTH: usize = 16;
-	    rand::thread_rng().gen_ascii_chars().take(LENGTH).collect()
-	}
-	fn send_req_rep<I: protobuf::Message, O: protobuf::Message>(
+    use protobuf::{Message as ProtobufMessage};
+    use protobuf;
+    use sawtooth_sdk::messages::consensus::*;
+    use sawtooth_sdk::messages::validator::{Message, Message_MessageType};
+    use sawtooth_sdk::messaging::zmq_stream::ZmqMessageConnection;
+    use sawtooth_sdk::messaging::stream::MessageConnection;
+    fn generate_correlation_id() -> String {
+        const LENGTH: usize = 16;
+        rand::thread_rng().gen_ascii_chars().take(LENGTH).collect()
+    }
+    fn send_req_rep<I: protobuf::Message, O: protobuf::Message>(
         connection_id: &[u8],
         socket: &zmq::Socket,
         request: I,
@@ -281,7 +304,7 @@ mod tests {
         (connection_id, request)
     }
 
-	macro_rules! service_test {
+    macro_rules! service_test {
         (
             $socket:expr,
             $rep:expr,
@@ -320,8 +343,8 @@ mod tests {
             let mut svc = Poet2Service::new( Box::new(zmq_svc) );
             
             svc.initialize_block(Some(Default::default()));
-		});
-		service_test!(
+        });
+        service_test!(
             &socket,
             ConsensusInitializeBlockResponse::new(),
             ConsensusInitializeBlockResponse_Status::OK,
@@ -333,6 +356,6 @@ mod tests {
     
     #[test]
     fn test_dummy() {
-    	assert_eq!(4, 2+2);
+        assert_eq!(4, 2+2);
     }
 }

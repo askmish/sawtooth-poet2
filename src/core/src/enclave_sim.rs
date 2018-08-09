@@ -30,16 +30,23 @@ use sawtooth_sdk::signing::Context;
 use serde_json;
 use rand;
 
+pub fn to_hex_string(bytes: Vec<u8>) -> String {
+    let strs: Vec<String> = bytes.iter()
+                               .map(|b| format!("{:02x}", b))
+                               .collect();
+    strs.join("")
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WaitCertificate {
-    duration_id : String,
-    wait_time :  u64,
-    local_mean : f64,
-    block_id : String,
-    prev_block_id : String,
-    block_hash : String,
-    block_number : u64,
-    validator_id : String,
+    pub duration_id : String,
+    pub wait_time :  u64,
+    pub local_mean : f64,
+    pub block_id : String,
+    pub prev_block_id : String,
+    pub block_hash : String,
+    pub block_number : u64,
+    pub validator_id : String,
 }
 
 impl Default for WaitCertificate {
@@ -67,7 +74,7 @@ impl Default for PoetKeyPair {
         PoetKeyPair { 
             private_key : String::new(),
             public_key : String::new(),
-	}
+        }
     }
 }
 
@@ -83,10 +90,11 @@ pub fn create_signup_info() {
     poet_key_pair.private_key = private_key.as_hex();
     let public_key = context.get_public_key(&*private_key).unwrap();
     poet_key_pair.public_key = public_key.as_hex();
-   
+
     let mut poetkeypair_handle = POETKEYPAIR.lock().unwrap();
     poetkeypair_handle.private_key = poet_key_pair.private_key;
     poetkeypair_handle.public_key = poet_key_pair.public_key;
+    info!("Created poet public/private key pair.");
 }
 
 fn truncate_biguint_to_u64(num: &BigUint) -> u64 {
@@ -97,7 +105,7 @@ fn truncate_biguint_to_u64(num: &BigUint) -> u64 {
 
 pub fn create_wait_certificate(
     in_block_id: &Vec<u8>,
-    in_serialized_prev_wait_certificate: &String,
+    in_serialized_prev_wait_certificate: String,
     in_block_digest: &Vec<u8>,
     in_validator_id: &Vec<u8>,
     in_block_number: u64,
@@ -108,23 +116,31 @@ pub fn create_wait_certificate(
     let duration = rng.gen_biguint(256);
     let minimum_duration : f64 = 1.0_f64;
     let duration64 = truncate_biguint_to_u64(&duration);
-    let wait_time = minimum_duration - in_local_mean * (duration64 as f64).log10();
+    let wait_time = minimum_duration - in_local_mean * ((duration64 as f64).log10() - (u64::max_value() as f64).log10());
 
     let mut prev_block_id = String::new();
     if !in_serialized_prev_wait_certificate.is_empty() {
-	 let prev_wait_certificate : WaitCertificate = serde_json::from_str(&in_serialized_prev_wait_certificate).unwrap();
-         prev_block_id = prev_wait_certificate.block_id.to_owned();
+
+        let deserialized_prev_cert = serde_json::from_str(&in_serialized_prev_wait_certificate);
+        let mut prev_wait_certificate : WaitCertificate = WaitCertificate::default();
+        if deserialized_prev_cert.is_ok(){
+            prev_wait_certificate = deserialized_prev_cert.unwrap();
+            prev_block_id = prev_wait_certificate.block_id.to_owned();
+        }
+        else {
+            prev_block_id = String::from("0");
+        }
     }
 
     let out_wait_certificate = WaitCertificate {
         duration_id  : duration.to_str_radix(16).to_owned(), // store durationId as hex string
         wait_time    : (wait_time as u64).to_owned(),
         local_mean   : in_local_mean.to_owned(),
-        block_id     : String::from_utf8(in_block_id.to_vec()).unwrap().to_owned(),
+        block_id     : to_hex_string(in_block_id.to_vec()),
         prev_block_id : prev_block_id.to_owned(),
-        block_hash   : String::from_utf8(in_block_digest.to_vec()).unwrap().to_owned(),
+        block_hash   : to_hex_string(in_block_digest.to_vec()),
         block_number : in_block_number.to_owned(),
-        validator_id : String::from_utf8(in_validator_id.to_vec()).unwrap().to_owned()
+        validator_id : to_hex_string(in_validator_id.to_vec())
     };
 
     let out_serialized_wait_certificate = serde_json::to_string(&out_wait_certificate).unwrap();
@@ -132,10 +148,11 @@ pub fn create_wait_certificate(
     let poet_private_key_str = POETKEYPAIR.lock().unwrap().private_key.to_string();
     let context = create_context("secp256k1").unwrap();
     let poet_private_key = Secp256k1PrivateKey::from_hex(&poet_private_key_str).unwrap();
-   
+
     let wc = out_serialized_wait_certificate.clone();
- 
+
     let out_wait_certificate_signature = context.sign(&wc.into_bytes(), &poet_private_key).unwrap();
+    info!("Created new Wait Certificate for BlockId : {:?}", in_block_id.clone());
     return (out_serialized_wait_certificate, out_wait_certificate_signature);
 }
 

@@ -22,6 +22,7 @@ use std::time::Instant;
 
 use rand;
 use rand::Rng;
+use enclave_sim::*;
 
 const DEFAULT_WAIT_TIME: u64 = 0;
 
@@ -32,7 +33,7 @@ pub struct Poet2Service {
 }
 
 impl Poet2Service {
-       pub fn new(service_: Box<Service>) -> Self {
+    pub fn new(service_: Box<Service>) -> Self {
         let now = Instant::now();
         Poet2Service { 
             service : service_,
@@ -84,23 +85,25 @@ impl Poet2Service {
             .expect("Failed to initialize block");
     }
 
-    pub fn finalize_block(&mut self) -> BlockId {
-        debug!("Finalizing block");
+    pub fn summarize_block(&mut self) -> Vec<u8> {
+        debug!("Summarizing block");
         let mut summary = self.service.summarize_block();
         while let Err(Error::BlockNotReady) = summary {
-            warn!("Block not ready to summarize");
-            sleep(time::Duration::from_secs(1));
-            summary = self.service.summarize_block();
+           warn!("Block not ready to summarize");
+           sleep(time::Duration::from_secs(1));
+           summary = self.service.summarize_block();
         }
+        summary.expect("Failed to summarize block")
+    }
 
-        let consensus: Vec<u8> = create_consensus(&summary.expect("Failed to summarize block"));
+    pub fn finalize_block(&mut self, consensus: Vec<u8>) -> BlockId {
+        debug!("Finalizing block");
         let mut block_id = self.service.finalize_block(consensus.clone());
         while let Err(Error::BlockNotReady) = block_id {
             warn!("Block not ready to finalize");
             sleep(time::Duration::from_secs(1));
             block_id = self.service.finalize_block(consensus.clone());
         }
-
         block_id.expect("Failed to finalize block")
     }
 
@@ -143,10 +146,10 @@ impl Poet2Service {
         };
     }
 
-    pub fn broadcast(&mut self, block_id: BlockId) {
-        debug!("Broadcasting published block: {:?}", block_id);
+    pub fn broadcast(&mut self, payload: Vec<u8>) {
+        debug!("Broadcasting payload");
         self.service
-            .broadcast("published", Vec::from(block_id))
+            .broadcast("published", payload)
             .expect("Failed to broadcast published block");
     }
 
@@ -229,17 +232,31 @@ impl Poet2Service {
 
     pub fn get_setting_from_head(&mut self, key:String) ->  String {
 
-        let mut head_id:BlockId = self.get_chain_head().block_id;
+        let head_id:BlockId = self.get_chain_head().block_id;
         self.get_setting( head_id, key )
     }
-}
 
-fn create_consensus(summary: &[u8]) -> Vec<u8> {
-    let mut consensus: Vec<u8> = Vec::from(&b"PoET2_Consensus"[..]);
-    consensus.extend_from_slice(summary);
-    consensus
-}
+    pub fn create_consensus(&mut self, summary: Vec<u8>, chain_head: Block, validator_id: Vec<u8>, new_block_id: BlockId) -> String {
+         //let mut consensus: Vec<u8> = vec![];
 
+         let mut head_block = chain_head.clone();
+         let head_wait_cert = head_block.payload;
+         let head_block_num = head_block.block_num;
+
+         // @TODO : Replace new_block_id with block_digest
+         info!("Block id returned is {:?}", Vec::from(new_block_id.clone()));
+         let (serial_cert, cert_signature) = create_wait_certificate(
+                 &new_block_id.clone(),
+                 String::from_utf8(head_wait_cert).expect("Found invalid UTF-8"),
+                 &summary.clone(),
+                 &validator_id,
+                 head_block_num+1,
+                 5.5_f64,
+             );
+
+         serial_cert.clone()
+    }
+}
 
 #[cfg(test)]
 mod tests {

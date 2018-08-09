@@ -26,8 +26,10 @@ use std::time;
 use std::str::FromStr;
 use std::cmp;
 use serde_json::from_str;
-use enclave_sim::WaitCertificate;
-
+use enclave_sim::*;
+use std::time::Duration;
+use enclave_sim::*;
+use std::collections::HashMap;
 
 const DEFAULT_BLOCK_CLAIM_LIMIT:i32 = 250;
 
@@ -56,6 +58,11 @@ impl Engine for Poet2Engine {
         let mut wait_time = service.calculate_wait_time(chain_head.block_id.clone());
         let mut published_at_height = false;
         let mut start = time::Instant::now();
+        let validator_id = Vec::from(startup_state.local_peer_info.peer_id);
+        let mut block_num_id_map = HashMap::new();
+        let mut block_num:u64 = 0;
+
+        create_signup_info();
 
         service.initialize_block(None);
 
@@ -108,7 +115,9 @@ impl Engine for Poet2Engine {
                                         && block.block_id > chain_head.block_id)
                                 {
                                     info!("Committing {:?}", block);
-                                    service.commit_block(block_id);
+                                    service.commit_block(block_id.clone());
+                                    block_num_id_map.insert(block_num, block_id);
+                                    block_num += 1;
                                 } else {
                                     info!("Ignoring {:?}", block);
                                     service.ignore_block(block_id);
@@ -246,8 +255,10 @@ impl Engine for Poet2Engine {
                             );
 
                             service.cancel_block();
+                            info!("Cancelled block in progress.");
 
-                            wait_time = service.calculate_wait_time(new_chain_head.clone());
+                            // Need to get wait_time from certificate
+                            // wait_time = service.calculate_wait_time(new_chain_head.clone());
                             published_at_height = false;
                             start = time::Instant::now();
                             unsafe {
@@ -300,10 +311,24 @@ impl Engine for Poet2Engine {
 
             if !published_at_height && time::Instant::now().duration_since(start) > wait_time {
                 info!("Timer expired -- publishing block");
-                let new_block_id = service.finalize_block();
+
+                let summary = service.summarize_block();
+                let consensus: String = service.create_consensus(summary,
+                                                                 chain_head.clone(),
+                                                                 validator_id.clone(),
+                                                                 BlockId::default());
+
+                let new_block_id = service.finalize_block(consensus.as_bytes().to_vec());
+                let deserial_cert: WaitCertificate = from_str(&consensus).unwrap();
+
+                wait_time = Duration::from_secs(deserial_cert.wait_time);
+                info!("New wait time is : {:?}",wait_time);
+
                 published_at_height = true;
 
-                service.broadcast(new_block_id);
+                //iservice.broadcast(serial_cert.as_bytes().to_vec());
+                service.broadcast(new_block_id.to_vec());
+
             }
         }
     }
@@ -405,4 +430,3 @@ impl FromStr for ResponseMessage {
         }
     }
 }
-

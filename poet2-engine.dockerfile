@@ -32,6 +32,7 @@ RUN echo "deb [arch=amd64] http://repo.sawtooth.me/ubuntu/ci xenial universe" >>
     git \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
+
 RUN \
  if [ ! -z $HTTP_PROXY ] && [ -z $http_proxy ]; then \
   http_proxy=$HTTP_PROXY; \
@@ -60,10 +61,5 @@ ENV PATH=$PATH:/protoc3/bin:/project/sawtooth-core/bin:/root/.cargo/bin \
     CARGO_INCREMENTAL=0
 
 RUN rustup component add rustfmt-preview
-
-RUN mkdir -p /project/ \
-&& current_dir=`pwd` \
-&& cd /project \
-&& git clone -b master --single-branch https://github.com/hyperledger/sawtooth-core.git
 
 WORKDIR /

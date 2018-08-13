@@ -28,24 +28,65 @@ pub trait ConsensusStateStore {
     fn get<'a>(
         &'a self,
         block_id: &str,
-    ) -> Result<Box<ConsensusState + 'a>, ConsensusStateStoreError>;
+    ) -> Result<Box<ConsensusState>, ConsensusStateStoreError>;
 
     fn delete(&mut self, block_id: &str) -> Result<ConsensusState, ConsensusStateStoreError>;
 
-    fn put(&mut self, block_id: &str, consensus_state: &ConsensusState>) -> Result<(), ConsensusStateStoreError>;
+    fn put(&mut self, block_id: &str, consensus_state: ConsensusState) -> Result<(), ConsensusStateStoreError>;
 }
 
 #[derive(Default)]
 pub struct InMemoryConsensusStateStore {
-    consensus_state_by_block_id: HashMap<String, ConsensusState>,
+    consensus_state_map: HashMap<String, ConsensusState>,
 }
 
 impl InMemoryConsensusStateStore {
     pub fn new() -> Self {
         InMemoryConsensusStateStore::default()
     }
+}
 
-    fn get_consensus_state(&self, block_id: &str) -> Option<&ConsensusState> {
-        self.consensus_state_by_block_id.get(block_id)
+impl ConsensusStateStore for InMemoryConsensusStateStore {
+    fn get<'a>(
+        &'a self,
+        block_id: &str,
+    ) -> Result<Box<ConsensusState>, ConsensusStateStoreError> {
+        let state = self.consensus_state_map.get(block_id);
+        match state {
+            None => {
+                trace!("No state found for block_id : {}", block_id);
+                Err(ConsensusStateStoreError::UnknownConsensusState)
+            },
+            Some(consensus_state) => {
+                Ok(Box::new(consensus_state.clone()))
+            }
+        }
+    }
+
+    fn delete(&mut self, block_id: &str) -> Result<ConsensusState, ConsensusStateStoreError>{
+        let value = self.consensus_state_map.remove(block_id);
+        match value {
+            None => {
+                trace!("No state found for block_id : {}", block_id);
+                Err(ConsensusStateStoreError::UnknownConsensusState)
+            },
+            Some(consensus_state) => {
+                Ok(consensus_state)
+            }
+        }
+
+    }
+
+    fn put(&mut self, block_id: &str, consensus_state: ConsensusState) -> Result<(), ConsensusStateStoreError>{
+        let value = self.consensus_state_map.insert(block_id.to_string(), consensus_state);
+        match value {
+            None => {
+                trace!("New [key,value] inserted for  block_id : {}", block_id);
+            },
+            Some(consensus_state) => {
+                trace!("Updated state for block_id : {}", block_id);
+            }
+        }
+        Ok(())
     }
 }

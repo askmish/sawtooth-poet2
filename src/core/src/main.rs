@@ -34,6 +34,9 @@ extern crate zmq;
 pub mod engine;
 pub mod service;
 pub mod enclave_sim;
+pub mod database;
+pub mod consensus_state;
+pub mod consensus_state_store;
 
 use engine::Poet2Engine;
 use sawtooth_sdk::consensus::{zmq_driver::ZmqDriver};

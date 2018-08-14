@@ -83,11 +83,33 @@ pub struct PoetSettingsView{
     population_estimate_sample_size: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, Default)]
 struct BlockInfo{
     wait_certificate: Option<WaitCertificate>,
     validator_info: Option<ValidatorInfo>,
     poet_settings_view: Option<PoetSettingsView>,
+}
+
+impl PartialEq for BlockInfo{
+    fn eq( &self, other: &BlockInfo) -> bool {
+        let self_ = self.clone();
+        let other_ = other.clone();
+
+
+        if (((self.wait_certificate.is_some() && other.wait_certificate.is_some()) 
+            && (self_.wait_certificate.unwrap() == other_.wait_certificate.unwrap()))
+          || (self.wait_certificate.is_none() && other.wait_certificate.is_none())) 
+        && (((self.validator_info.is_some() && other.validator_info.is_some()) 
+            && (self_.validator_info.unwrap() == other_.validator_info.unwrap()))
+          || (self.validator_info.is_none() && other.validator_info.is_none())) 
+        && (((self.poet_settings_view.is_some() && other.poet_settings_view.is_some()) 
+            && (self_.poet_settings_view.unwrap() == other_.poet_settings_view.unwrap()))
+          || (self.poet_settings_view.is_none() && other.poet_settings_view.is_none())) 
+        
+           { true }
+        else    
+           { false }
+    }
 }
 
 #[derive(Clone, Default, Debug)]
@@ -97,6 +119,7 @@ struct Entry{
 }
 
 impl ConsensusState{
+
     const MINIMUM_WAIT_TIME: f64 =  1.0; 
     pub fn consensus_state_for_block_id(&mut self, block_id: BlockId, svc: &mut Poet2Service) -> Option<ConsensusState>{
        let mut previous_wait_certificate: Option<WaitCertificate> = None;
@@ -143,34 +166,33 @@ impl ConsensusState{
          }
        }
        consensus_state 
-
     }
 
     pub fn validator_did_claim_block(&mut self, validator_info: &ValidatorInfo, wait_certificate: &WaitCertificate, poet_settings_view: &PoetSettingsView ) -> (){
-      self._aggregate_local_mean += wait_certificate.localMean;
-      self._total_block_claim_count += 1;
-      self._population_samples.push_back( PopulationSample{ wait_time: wait_certificate.waitTime , local_mean: wait_certificate.localMean}); 
-      while self._population_samples.len() > poet_settings_view.population_estimate_sample_size{
-        self._population_samples.pop_front();
+      self.aggregate_local_mean += wait_certificate.local_mean;
+      self.total_block_claim_count += 1;
+      self.population_samples.push_back( PopulationSample{ wait_time: wait_certificate.wait_time , local_mean: wait_certificate.local_mean}); 
+      while self.population_samples.len() > poet_settings_view.population_estimate_sample_size{
+        self.population_samples.pop_front();
       }
        let mut validator_state = self.get_validator_state(validator_info.clone());
        let mut total_block_claim_count = validator_state.total_block_claim_count + 1;
        let mut key_block_claim_count = if validator_info.poet_public_key == validator_state.poet_public_key {
-          validator_state.key_block_claim_count + 1
-         } 
-       else{
-         1
-       };
+                                                validator_state.key_block_claim_count + 1
+                                       } 
+                                       else{
+                                           1
+                                       };
        let peerid_vec = Vec::from(validator_info.clone().id);
        let peerid_str = String::from_utf8(peerid_vec).expect("Found Invalid UTF-8");
-       self._validators.insert(peerid_str, ValidatorState{ key_block_claim_count: key_block_claim_count, poet_public_key: validator_info.clone().poet_public_key, total_block_claim_count: total_block_claim_count});
-       
+       self.validators.insert(peerid_str, ValidatorState{ key_block_claim_count: key_block_claim_count, poet_public_key: validator_info.clone().poet_public_key, total_block_claim_count: total_block_claim_count});
+
    }
 
    pub fn get_validator_state(&mut self,  validator_info: ValidatorInfo) -> Box<ValidatorState>{
      let peerid_vec = Vec::from(validator_info.clone().id);
      let peerid_str = String::from_utf8(peerid_vec).expect("Found Invalid UTF-8");
-     let mut validator_state = self._validators.get(&peerid_str);
+     let mut validator_state = self.validators.get(&peerid_str);
      let mut val_state = ValidatorState{ key_block_claim_count: 0, poet_public_key: validator_info.clone().poet_public_key, total_block_claim_count: 0};
      if validator_state.is_none(){
       return Box::new(val_state); 

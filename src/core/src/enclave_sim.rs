@@ -37,7 +37,7 @@ pub fn to_hex_string(bytes: Vec<u8>) -> String {
     strs.join("")
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct WaitCertificate {
     pub duration_id : String,
     pub wait_time :  u64,

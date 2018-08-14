@@ -32,6 +32,6 @@ services:
     entrypoint: "bash -c \"rm -rf /project/sawtooth-poet2/src/core/bin &&\
 	mkdir -p ./bin/ &&\
 	cd /project/sawtooth-poet2/src/core &&\ 
-	cargo build --release && cp ./target/release/poet2 ./bin/poet2 &&\	
+	cargo build --release && cp ./target/release/poet2 ./bin/poet2 &&\
 	cargo run --bin poet2 -- -C tcp://localhost:5005 && tail -f /dev/null \""
     stop_signal: SIGKILL

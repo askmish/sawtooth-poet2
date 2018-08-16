@@ -28,7 +28,8 @@ use std::cmp;
 use serde_json::from_str;
 use std::time::Duration;
 use enclave_sim::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use consensus_state::*;
 use consensus_state_store::{ConsensusStateStore, InMemoryConsensusStateStore};
 
 const DEFAULT_BLOCK_CLAIM_LIMIT:i32 = 250;
@@ -379,8 +380,6 @@ fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
     // 4. Match Local Mean against the locally computed
     // 5. Verfidy BlockDigest is a valid ECDSA of
     //    SHA256 hash of block using OPK
-    // 6. z-test
-    // 7. c-test
 
     //\\ 2. Signature validation using sender's PPK
     if !verify_wait_certificate(block){
@@ -391,6 +390,17 @@ fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
     if validtor_has_claimed_block_limit( service ) {
         return false;
     }
+
+    // 6. z-test
+    /*if validator_is_claiming_too_frequently {
+        return false;
+    }*/
+
+    // 7. c-test
+    if validator_is_claiming_too_early( service ) {
+        return false;
+    }
+
     //\\ 8. Compare CC & WC
     let chain_clock = service.get_chain_clock();
     let wall_clock = service.get_wall_clock();
@@ -435,6 +445,42 @@ fn validtor_has_claimed_block_limit( service: &mut Poet2Service ) -> bool {
     else{ false }
 }
 
+
+//c-test
+//      fn validator_is_claiming_too_early(&mut self , block_id : BlockId ,block_number : i32 ,validator_registry_view:ValidatorRegistryView , block_store:Blockstore)
+fn validator_is_claiming_too_early( service: &mut Poet2Service )->bool
+{
+
+    let number_of_validators = 32;
+    let total_block_claim_count = 33 ;
+    let commit_block_block_num = 2;
+    let block_number = 5 ;
+//  number_of_validators = (validator_registry_view.get_validators()).len();  //stubbed function
+    let block_claim_delay_from_settings = service.get_setting_from_head(
+        String::from("sawtooth.poet.block_claim_delay"));
+
+    let key_block_claim_delay = block_claim_delay_from_settings.parse::<i32>().unwrap();
+    let block_claim_delay = cmp::min(key_block_claim_delay, number_of_validators - 1);
+
+    if total_block_claim_count <= block_claim_delay
+    {
+        return false;
+    }
+    // need to use get_block from service expecting block_id to have been stored
+    // along with validator info in the Poet 2 module
+
+//  let commit_block = block_store.get_block_by_transaction_id(validator_info.transaction_id)  //
+
+    let blocks_claimed_since_registration = block_number - commit_block_block_num - 1 ;
+
+    if block_claim_delay > blocks_claimed_since_registration
+    {
+        return true;
+    }
+    return false;
+
+}
+
 pub enum ResponseMessage {
     Ack,
     Published,
@@ -453,3 +499,73 @@ impl FromStr for ResponseMessage {
         }
     }
 }
+
+//z-test
+/*
+fn validator_is_claiming_too_frequently(&mut self,
+                                        validator_info: ValidatorInfo,
+                                        previous_block_id: &str,
+                                        poet_settings_view: PoetSettingsView,
+                                        population_estimate: f64,
+                                        block_cache: BlockCache,
+                                        poet_enclave_module: module) -> bool {
+
+    if self.total_block_claim_count < poet_settings_view.population_estimate_sample_size {  //totalblock count-0  pop-est-1
+        return false;
+    }
+
+    let mut population_estimate_list = VecDeque::new();
+    population_estimate_list = self._build_population_estimate_list(previous_block_id, poet_settings_view,block_cache,poet_enclave_module);
+
+    population_estimate_list.insert(ConsensusState._EstimateInfo(population_estimate, previous_block_id, validator_info.id),0);
+    //[_EstimateInfo(population_estimate=2, previous_block_id='previous_id', validator_id='validator_001_key')]
+    let mut observed_wins =0.0;
+    let mut expected_wins =0.0;
+    let mut block_count =0;
+    let mut minimum_win_count = poet_settings_view.ztest_minimum_win_count as f64; // Expecting it to be a float type value else type casting is required-----3
+    let mut maximum_win_deviation = poet_settings_view.ztest_maximum_win_deviation as f64; // Expecting it to be a float type value else type casting is required---3.075
+
+
+    for estimate_info in population_estimate_list.iter(){
+        block_count += 1; //1
+        //Float and integer addition might cause error
+        expected_wins += 1.0/estimate_info.population_estimate; //0.5    estimate_info.population_estimate----2
+
+        if estimate_info.validator_id == validator_info.id {  //validator_001_key
+            observed_wins += 1.0; //1
+            if observed_wins > minimum_win_count && observed_wins > expected_wins{ // Might be comparing float with integer value
+                let mut probability = expected_wins/block_count as f64; //Depends on the lngth of the block_count
+                let mut standard_deviation = (block_count as f64 * probability * (1.0 - probability)).sqrt();
+                let mut z_score = (observed_wins - expected_wins) / standard_deviation;
+                let mut validator_info_id: &str = validator_info.id;
+                let mut validator_info_id_start = &validator_info_id[0..8];
+                let mut validator_info_id_end: Vec<char> = validator_info_id.chars().rev().take(8).collect();
+                if z_score  > maximum_win_deviation {
+
+                    info!("Validator {} (ID={}...{}): z-test failded at depth {}, z_score={} ,expected={} , observed={}",
+                            validator_info.name,
+                            validator_info_id_start,
+                            validator_info_id_end,
+                            block_count,
+                            z_score,
+                            expected_wins,
+                            observed_wins);
+
+                    return true;
+                }
+            }
+        }
+    }
+    let validator_info_id = validator_info.id;
+    let validator_info_id_start = &validator_info_id[0..8];
+    let mut validator_info_id_end: Vec<char> = validator_info_id.chars().rev().take(8).collect();
+    info!("Validator {} (ID={}...{}): zTest succeeded at depth {}, expected={} , observed={}",
+                            validator_info.name,
+                            validator_info_id_start,
+                            validator_info_id_end,
+                            block_count,
+                            expected_wins,
+                            observed_wins);
+
+    return false;
+}*/

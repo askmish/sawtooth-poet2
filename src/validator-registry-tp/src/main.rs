@@ -21,27 +21,16 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate log;
 extern crate log4rs;
-extern crate num;
-extern crate protobuf;
-extern crate rand;
 extern crate sawtooth_sdk;
-extern crate zmq;
 extern crate crypto;
 
-pub mod engine;
-pub mod service;
-pub mod enclave_sim;
-pub mod database;
-pub mod consensus_state;
-pub mod consensus_state_store;
+pub mod validator_registry_tp;
+pub mod validator_registry_proto;
 
-use engine::Poet2Engine;
-use sawtooth_sdk::consensus::{zmq_driver::ZmqDriver};
-
+use sawtooth_sdk::processor::TransactionProcessor;
+use validator_registry_tp::ValidatorRegistryTransactionHandler;
 use std::process;
 use log::LogLevelFilter;
 use log4rs::append::console::ConsoleAppender;
@@ -51,7 +40,7 @@ use log4rs::encode::pattern::PatternEncoder;
 fn main() {
 	 let matches = clap_app!(intkey =>
         (version: crate_version!())
-        (about: "PoET Consensus Engine 2")
+        (about: "Validator Registry Transaction Processor")
         (@arg connect: -C --connect +takes_value
          "connection endpoint for validator")
         (@arg verbose: -v --verbose +multiple
@@ -60,7 +49,7 @@ fn main() {
 
     let endpoint = matches
         .value_of("connect")
-        .unwrap_or("tcp://localhost:5005");
+        .unwrap_or("tcp://localhost:4004");
 
     let console_log_level;
     match matches.occurrences_of("verbose") {
@@ -89,11 +78,12 @@ fn main() {
         process::exit(1);
     });
     
-    let (driver, _stop_handle) = ZmqDriver::new();
-	info!("Starting the ZMQ Driver.");
-	
-    driver.start(&endpoint, Poet2Engine::new()).unwrap_or_else(|_err| {
-        process::exit(1);
-    });
+    let handler = ValidatorRegistryTransactionHandler::new();
+    let mut processor = TransactionProcessor::new(endpoint);
+
+    info!("Console logging level: {}", console_log_level);
+
+    processor.add_handler(&handler);
+    processor.start();
 }
 

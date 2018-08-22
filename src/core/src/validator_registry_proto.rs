@@ -15,25 +15,29 @@
  * -----------------------------------------------------------------------------
  */
 
+use sawtooth_sdk::processor::handler::ApplyError;
+use std::str::from_utf8;
+use serde_json;
+
 const VALIDATOR_NAME_LEN : u32 = 64; 
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct SignupInfo {
-    poet_public_key : String,
-    proof_data : String,
-    anti_sybil_id : String,
-    nonce :String,
+    pub poet_public_key : String,
+    pub proof_data : String,
+    pub anti_sybil_id : String,
+    pub nonce :String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct ValidatorInfo {
-    name : String,
-    id : String,
-    signup_info : SignupInfo,
-    txn_id : String
+    pub name : String,
+    pub id : String,
+    pub signup_info : SignupInfo,
+    pub txn_id : String
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ValidatorRegistryPayload {
     verb : String,
     name : String,
@@ -43,7 +47,8 @@ pub struct ValidatorRegistryPayload {
 
 impl ValidatorRegistryPayload {
     pub fn new(payload_data: &[u8], public_key: &String) -> Result<ValidatorRegistryPayload, ApplyError> {
-        let payload_string = match std::str::from_utf8(&payload_data) {
+        let payload : ValidatorRegistryPayload;
+        let payload_string = match from_utf8(&payload_data) {
             Ok(s) => s,
             Err(_) => {
                 return Err(ApplyError::InvalidTransaction(String::from(
@@ -52,7 +57,7 @@ impl ValidatorRegistryPayload {
             }
         };
 
-        let deserialized_payload : ValidatorRegistryPayload = serde_json::from_str(&payload_string);
+        let deserialized_payload = serde_json::from_str(&payload_string);
         if deserialized_payload.is_ok() {
             payload = deserialized_payload.unwrap();
         } else {
@@ -61,13 +66,13 @@ impl ValidatorRegistryPayload {
                 )));
         }
 
-        if payload.name.len() <= 0 || payload.name.len() > VALIDATOR_NAME_LEN {
+        if payload.name.len() <= 0 || payload.name.len() > (VALIDATOR_NAME_LEN as usize) {
             return Err(ApplyError::InvalidTransaction(String::from(
                     format!("Invalid validator name length {}", payload.name.len()),
                 )));
         }
 
-        if payload.id != public_key {
+        if payload.id != public_key.to_string() {
             return Err(ApplyError::InvalidTransaction(String::from(
                     format!("Signature mismatch on validator registration with validator {} signed by {}",
                         &payload.id,

@@ -30,6 +30,7 @@ extern crate protobuf;
 extern crate rand;
 extern crate sawtooth_sdk;
 extern crate zmq;
+extern crate crypto;
 
 pub mod engine;
 pub mod service;
@@ -37,6 +38,8 @@ pub mod enclave_sim;
 pub mod database;
 pub mod consensus_state;
 pub mod consensus_state_store;
+pub mod validator_registry_tp;
+pub mod validator_registry_proto;
 
 use engine::Poet2Engine;
 use sawtooth_sdk::consensus::{zmq_driver::ZmqDriver};

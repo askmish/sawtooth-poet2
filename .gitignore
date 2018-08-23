@@ -22,5 +22,8 @@
 /src/core/Cargo.lock
 /src/core/bin/
 
-*.batch
+/src/validator-registry-tp/target/
+/src/validator-registry-tp/Cargo.lock
+/src/validator-registry-tp/bin/
 
+*.batch

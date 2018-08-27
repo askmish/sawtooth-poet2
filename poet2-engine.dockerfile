@@ -62,4 +62,4 @@ ENV PATH=$PATH:/protoc3/bin:/project/sawtooth-core/bin:/root/.cargo/bin \
 
 RUN rustup component add rustfmt-preview
 
-WORKDIR /
+WORKDIR /project/sawtooth-poet2

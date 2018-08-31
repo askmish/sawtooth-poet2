@@ -20,16 +20,10 @@ RUN echo "deb [arch=amd64] http://repo.sawtooth.me/ubuntu/nightly xenial univers
  || apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 44FC67F19B2466EA) \
  && apt-get update \
  && apt-get install -y -q --allow-downgrades \
-    build-essential \
-    curl \
-    libssl-dev \
-    gcc \
-    git \
     pkg-config \
     python3 \
     python3-sawtooth-cli \
     python3-sawtooth-validator \
     python3-requests \
-    unzip \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*

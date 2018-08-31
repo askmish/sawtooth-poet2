@@ -22,7 +22,7 @@ use std::time::Instant;
 
 use rand;
 use rand::Rng;
-use enclave_sim::*;
+use enclave_sim as enclave;
 
 const DEFAULT_WAIT_TIME: u64 = 0;
 
@@ -245,7 +245,7 @@ impl Poet2Service {
 
          // @TODO : Replace new_block_id with block_digest
          info!("Block id returned is {:?}", Vec::from(new_block_id.clone()));
-         let (serial_cert, cert_signature) = create_wait_certificate(
+         let (serial_cert, cert_signature) = enclave::create_wait_certificate(
                  &new_block_id.clone(),
                  String::from_utf8(head_wait_cert).expect("Found invalid UTF-8"),
                  &summary.clone(),
@@ -255,6 +255,11 @@ impl Poet2Service {
              );
 
          serial_cert.clone()
+    }
+
+    pub fn get_next_wait_time( &mut self ) -> u64 {
+        debug!("Getting new wait time for next block.");
+        enclave::get_next_wait_time( 5.5_f64 )
     }
 }
 

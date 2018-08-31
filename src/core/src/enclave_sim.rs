@@ -37,6 +37,11 @@ pub fn to_hex_string(bytes: Vec<u8>) -> String {
     strs.join("")
 }
 
+static mut NEXT_WAIT_TIME:u64 = 0_u64;
+lazy_static! {
+    static ref DURATION_HEX:Mutex<String> = Mutex::new(String::from("0"));
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct WaitCertificate {
     pub duration_id : String,
@@ -103,6 +108,20 @@ fn truncate_biguint_to_u64(num: &BigUint) -> u64 {
     (num & mask).to_u64().unwrap()
 }
 
+pub fn get_next_wait_time( in_local_mean: f64 ) -> u64{
+    let mut rng = rand::thread_rng();
+    let duration = rng.gen_biguint(256);
+    let minimum_duration : f64 = 1.0_f64;
+    let duration64 = truncate_biguint_to_u64(&duration);
+    let wait_time = minimum_duration - in_local_mean * ((duration64 as f64).log10()
+                        - (u64::max_value() as f64).log10());
+    unsafe{
+        *DURATION_HEX.lock().unwrap() = duration.to_str_radix(16);
+        NEXT_WAIT_TIME = wait_time as u64;
+    }
+    wait_time as u64
+}
+
 pub fn create_wait_certificate(
     in_block_id: &Vec<u8>,
     in_serialized_prev_wait_certificate: String,
@@ -112,11 +131,12 @@ pub fn create_wait_certificate(
     in_local_mean: f64)
     -> (String, String)
 {
-    let mut rng = rand::thread_rng();
-    let duration = rng.gen_biguint(256);
-    let minimum_duration : f64 = 1.0_f64;
-    let duration64 = truncate_biguint_to_u64(&duration);
-    let wait_time = minimum_duration - in_local_mean * ((duration64 as f64).log10() - (u64::max_value() as f64).log10());
+    let mut wait_time:u64 = 0_u64;
+    let mut duration:String;
+    unsafe{
+        wait_time = NEXT_WAIT_TIME;
+        duration = DURATION_HEX.lock().unwrap().to_string();
+    }
 
     let mut prev_block_id = String::new();
     if !in_serialized_prev_wait_certificate.is_empty() {
@@ -133,7 +153,7 @@ pub fn create_wait_certificate(
     }
 
     let out_wait_certificate = WaitCertificate {
-        duration_id  : duration.to_str_radix(16).to_owned(), // store durationId as hex string
+        duration_id  : duration.to_owned(), // store durationId as hex string
         wait_time    : (wait_time as u64).to_owned(),
         local_mean   : in_local_mean.to_owned(),
         block_id     : to_hex_string(in_block_id.to_vec()),

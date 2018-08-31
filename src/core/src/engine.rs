@@ -25,7 +25,7 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time;
 use std::str::FromStr;
 use std::cmp;
-use serde_json::from_str;
+use serde_json;
 use std::time::Duration;
 use enclave_sim::*;
 use std::collections::{HashMap, VecDeque};
@@ -43,7 +43,7 @@ impl Poet2Engine {
     }
 }
 
-static mut CLAIM_BLOCK : Option<Block> = None;
+static mut CLAIM_BLOCK_DUR : u64 = 0_u64;
 
 impl Engine for Poet2Engine {
     fn start(
@@ -59,6 +59,9 @@ impl Engine for Poet2Engine {
         let mut wait_time = service.calculate_wait_time(chain_head.block_id.clone());
         let mut published_at_height = false;
         let mut start = time::Instant::now();
+        unsafe {
+            CLAIM_BLOCK_DUR = service.get_next_wait_time();
+        }
         let validator_id = Vec::from(startup_state.local_peer_info.peer_id);
         let mut block_num_id_map:HashMap<u64, BlockId> = HashMap::new();
         let mut block_num:u64 = 0;
@@ -87,9 +90,6 @@ impl Engine for Poet2Engine {
                                 service.check_block(block.clone().block_id);
                                 // Retain the block in static scope here for
                                 // checks during fork resolution
-                                unsafe {
-                                    CLAIM_BLOCK = Some(block.clone());
-                                }
                             } else {
                                 info!("Failed consensus check: {:?}", block);
                                 service.fail_block(block.block_id);
@@ -140,12 +140,10 @@ impl Engine for Poet2Engine {
 
                                 // Commiting or Resolving fork if one exists
                                 // Advance the chain if possible.
-                                let mut claim_block:Option<Block> = None;
+                                let mut claim_block_dur:u64 = 0_u64;
                                 unsafe {
-                                    claim_block = CLAIM_BLOCK.clone();
+                                    claim_block_dur = CLAIM_BLOCK_DUR.clone();
                                 }
-                                let claim_block_dur = get_cert_from(&claim_block.unwrap()).wait_time;
-
 
                                 // Current block points to current head
                                 // Check if block already claimed. Go on to
@@ -169,9 +167,9 @@ impl Engine for Poet2Engine {
                                         published_at_height = false;
                                         start = time::Instant::now();
                                         unsafe {
-                                            CLAIM_BLOCK = None;
+                                            CLAIM_BLOCK_DUR = service.get_next_wait_time();
                                         }
-                                            service.initialize_block(None);
+                                            service.initialize_block(Some(block.previous_id));
                                     }
                                 }
 
@@ -180,10 +178,8 @@ impl Engine for Poet2Engine {
                                 else if prev_block_.is_ok(){
                                     let prev_block = prev_block_.unwrap();
 
-                                    if state_store.get(&String::from_utf8(
-                                                      Vec::from(prev_block.block_id))
-                                                      .expect("Found invalid UTF-8")).is_err() {
-
+                                        if state_store.get(&to_hex_string(
+                                                      Vec::from(prev_block.block_id))).is_err() {
                                         let mut cache_block = block.clone();
                                         let mut block_state;
                                         let mut block_state_;
@@ -199,8 +195,13 @@ impl Engine for Poet2Engine {
                                             // break from loop and send block to cache
                                             if cache_block_.is_ok() {
 
-                                                let cache_block = cache_block_.unwrap();
-                                                ancestor_cc = get_cert_from(&cache_block).wait_time; // get cc from certificate in cache_block
+                                                cache_block = cache_block_.unwrap();
+                                                if cache_block.block_num == 0 {
+                                                   debug!("Genesis reached while finding common ancestor.");
+                                                   break;
+                                                }
+                                                // get cc from certificate in cache_block
+                                                ancestor_cc = get_cert_from(&cache_block).wait_time;
                                                 fork_cc += ancestor_cc;
                                                 // Assuming here that we have the consensus state
                                                 // for each block that has been committed into the chain.
@@ -209,9 +210,8 @@ impl Engine for Poet2Engine {
                                                 // Keep account of the chainclocks from cache.
                                                 // Once common ancestor is found, compare the
                                                 // chainclocks of the forks to choose a fork
-                                                block_state_ = state_store.get(&String::from_utf8(
-                                                          Vec::from(cache_block.block_id))
-                                                          .expect("Found invalid UTF-8")); 
+                                                block_state_ = state_store.get(&to_hex_string(
+                                                       Vec::from(cache_block.block_id)));
                                                 if block_state_.is_ok() {
                                                     // Found common ancestor
                                                     info!("Found a common ancestor at block {:?}",block.clone());
@@ -280,9 +280,9 @@ impl Engine for Poet2Engine {
                             published_at_height = false;
                             start = time::Instant::now();
                             unsafe {
-                                    CLAIM_BLOCK = None;
+                                CLAIM_BLOCK_DUR = service.get_next_wait_time();
                             }
-                            service.initialize_block(None);
+                            service.initialize_block(Some(new_chain_head));
                         },
 
                         Update::PeerMessage(message, sender_id) => match ResponseMessage::from_str(
@@ -337,7 +337,7 @@ impl Engine for Poet2Engine {
                                                                  BlockId::default());
 
                 let new_block_id = service.finalize_block(consensus.as_bytes().to_vec());
-                let deserial_cert: WaitCertificate = from_str(&consensus).unwrap();
+                let deserial_cert: WaitCertificate = serde_json::from_str(&consensus).unwrap();
 
                 wait_time = Duration::from_secs(deserial_cert.wait_time);
                 info!("New wait time is : {:?}",wait_time);
@@ -364,7 +364,14 @@ impl Engine for Poet2Engine {
 fn get_cert_from(block:&Block) -> WaitCertificate {
     let payload = &block.payload;
     let payload_str = String::from_utf8(payload.to_vec()).expect("Found invalid UTF-8");
-    from_str(&payload_str).unwrap()
+    serde_json::from_str(&payload_str).unwrap()
+}
+
+pub fn to_hex_string(bytes: Vec<u8>) -> String {
+    let strs: Vec<String> = bytes.iter()
+        .map(|b| format!("{:02x}", b))
+    .collect();
+    strs.join("")
 }
 
 /*
@@ -387,9 +394,9 @@ fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
     }
 
     // 3. k-test
-    if validtor_has_claimed_block_limit( service ) {
+    /*if validtor_has_claimed_block_limit( service ) {
         return false;
-    }
+    }*/
 
     // 6. z-test
     /*if validator_is_claiming_too_frequently {
@@ -397,9 +404,9 @@ fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
     }*/
 
     // 7. c-test
-    if validator_is_claiming_too_early( service ) {
+    /*if validator_is_claiming_too_early( service ) {
         return false;
-    }
+    }*/
 
     //\\ 8. Compare CC & WC
     let chain_clock = service.get_chain_clock();

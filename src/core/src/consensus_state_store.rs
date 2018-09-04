@@ -58,6 +58,7 @@ impl ConsensusStateStore for InMemoryConsensusStateStore {
                 Err(ConsensusStateStoreError::UnknownConsensusState)
             },
             Some(consensus_state) => {
+                trace!("Found state for block_id : {}", block_id);
                 Ok(Box::new(consensus_state.clone()))
             }
         }
@@ -71,6 +72,7 @@ impl ConsensusStateStore for InMemoryConsensusStateStore {
                 Err(ConsensusStateStoreError::UnknownConsensusState)
             },
             Some(consensus_state) => {
+                trace!("Deleted state for block_id : {}", block_id);
                 Ok(consensus_state)
             }
         }

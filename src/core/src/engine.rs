@@ -65,7 +65,7 @@ impl Engine for Poet2Engine {
         let validator_id = Vec::from(startup_state.local_peer_info.peer_id);
         let mut block_num_id_map:HashMap<u64, BlockId> = HashMap::new();
         let mut block_num:u64 = 0;
-        let state_store = InMemoryConsensusStateStore::new();
+        let mut state_store = InMemoryConsensusStateStore::new();
 
         create_signup_info();
 
@@ -153,23 +153,23 @@ impl Engine for Poet2Engine {
                                       && block.previous_id == chain_head.block_id {
 
                                     let mut new_block_dur = get_cert_from(&block).wait_time;
+                                    debug!("New block duration {} Claim block duration {}", new_block_dur, claim_block_dur);
                                     if new_block_dur <= claim_block_dur{
                                         info!("Discarding the block in progress.");
-                                        info!("New block duration {} Claim block duration {}", new_block_dur, claim_block_dur);
                                         service.cancel_block();
                                         info!("New block extends current chain. Committing {:?}", block);
+                                        let mut agg_chain_clock = service.get_chain_clock() +
+                                                        get_cert_from(&block).wait_time;
+                                        let mut state = ConsensusState::default();
+                                        state.aggregate_chain_clock = agg_chain_clock;
+                                        trace!("Storing cummulative cc = {}", agg_chain_clock);
+                                        state_store.put(&to_hex_string(Vec::from(block_id.clone())), state);
+                                        service.set_chain_clock(agg_chain_clock);
                                         service.commit_block(block_id);
                                     }
                                     else {
                                         info!("New block has larger duration. Failing {:?}", block);
-                                        info!("New block duration {} Claim block duration {}", new_block_dur, claim_block_dur);
                                         service.fail_block(block_id);
-                                        published_at_height = false;
-                                        start = time::Instant::now();
-                                        unsafe {
-                                            CLAIM_BLOCK_DUR = service.get_next_wait_time();
-                                        }
-                                            service.initialize_block(Some(block.previous_id));
                                     }
                                 }
 
@@ -178,19 +178,21 @@ impl Engine for Poet2Engine {
                                 else if prev_block_.is_ok(){
                                     let prev_block = prev_block_.unwrap();
 
-                                        if state_store.get(&to_hex_string(
-                                                      Vec::from(prev_block.block_id))).is_err() {
+                                    if state_store.get(&to_hex_string(
+                                                  Vec::from(prev_block.block_id))).is_err() {
                                         let mut cache_block = block.clone();
                                         let mut block_state;
                                         let mut block_state_;
-                                        let mut head_cc = get_cert_from(&chain_head).wait_time;
+                                        let mut cc_upto_head = service.get_chain_clock();
                                         let mut fork_cc:u64 = get_cert_from(&cache_block).wait_time;
                                         let mut fork_len:u64 = 1;
-                                        let mut ancestor_cc = 0;
+                                        let mut cc_upto_ancestor = 0_u64;
                                         let mut ancestor_found:bool = false;
+                                        info!("Looping over chain to find common ancestor.");
 
                                         loop {
                                             let mut cache_block_ = service.get_block(cache_block.previous_id.clone());
+
                                             // If block's previous not in cache or blockstore,
                                             // break from loop and send block to cache
                                             if cache_block_.is_ok() {
@@ -198,11 +200,13 @@ impl Engine for Poet2Engine {
                                                 cache_block = cache_block_.unwrap();
                                                 if cache_block.block_num == 0 {
                                                    debug!("Genesis reached while finding common ancestor.");
+                                                   ancestor_found = true;
                                                    break;
                                                 }
+
                                                 // get cc from certificate in cache_block
-                                                ancestor_cc = get_cert_from(&cache_block).wait_time;
-                                                fork_cc += ancestor_cc;
+                                                let mut ancestor_cc = get_cert_from(&cache_block).wait_time;
+
                                                 // Assuming here that we have the consensus state
                                                 // for each block that has been committed into the chain.
                                                 // Parse blocks from cache & states from the statestore
@@ -217,8 +221,10 @@ impl Engine for Poet2Engine {
                                                     info!("Found a common ancestor at block {:?}",block.clone());
                                                     ancestor_found = true;
                                                     block_state = block_state_.unwrap();
+                                                    cc_upto_ancestor = block_state.aggregate_chain_clock;
                                                     break;
                                                 }
+                                                fork_cc += ancestor_cc;
                                                 fork_len += 1;
                                             }
                                             else {
@@ -228,7 +234,8 @@ impl Engine for Poet2Engine {
                                         let mut fork_won = false;
                                         let mut chain_cc:u64 = 0;
                                         if ancestor_found {
-                                            chain_cc = head_cc - ancestor_cc;
+                                            debug!("Found a common ancestor. Comparing length.");
+                                            chain_cc = cc_upto_head - cc_upto_ancestor;
                                             let mut chain_len:u64 = chain_head.block_num - cache_block.block_num;
                                             if chain_len > fork_len {
                                                 fork_won = false;
@@ -236,20 +243,29 @@ impl Engine for Poet2Engine {
                                             else if chain_len < fork_len {
                                                 fork_won = true;
                                             }
-                                        }
-                                        // Fork lengths are equal
-                                        else {
-                                            if chain_cc == fork_cc {
-                                                fork_won = if get_cert_from(&block).duration_id 
-                                                              <  get_cert_from(&chain_head).duration_id
-                                                            { true } else { false };
-                                            }
+                                            // Fork lengths are equal
                                             else {
-                                                fork_won = if fork_cc < chain_cc { true } else { false };
+                                                if chain_cc == fork_cc {
+                                                    fork_won = if get_cert_from(&block).duration_id
+                                                                  <  get_cert_from(&chain_head).duration_id
+                                                                { true } else { false };
+                                                }
+                                                else {
+                                                    fork_won = if fork_cc < chain_cc { true } else { false };
+                                                }
                                             }
                                         }
                                         if fork_won {
                                             info!("Switching to fork.");
+                                            let mut agg_chain_clock = cc_upto_ancestor + fork_cc; // fork_cc is inclusive of new block 
+                                            let mut state = ConsensusState::default();
+                                            state.aggregate_chain_clock = agg_chain_clock;
+                                            trace!("Aggregate chain clock upto common ancestor = {} 
+                                                    Fork chain clock = {}. After switch aggregate = {}", 
+                                                    cc_upto_ancestor, fork_cc, agg_chain_clock);
+                                            trace!("Storing cummulative cc = {}", agg_chain_clock);
+                                            state_store.put(&to_hex_string(Vec::from(block_id.clone())), state);
+                                            service.set_chain_clock(agg_chain_clock);
                                             service.commit_block(block_id);
                                             // Mark all blocks upto common ancestor
                                             // in the chain as invalid.

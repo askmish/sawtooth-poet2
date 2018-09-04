@@ -35,7 +35,7 @@ pub struct ValidatorState {
 */
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
-struct PopulationSample {
+pub struct PopulationSample {
     wait_time: u64,
     local_mean: f64
 }
@@ -54,7 +54,7 @@ struct PopulationSample {
 *
 */
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
-struct EstimateInfo {
+pub struct EstimateInfo {
     population_estimate : f64,
     previous_block_id: String,
     validator_id: String
@@ -62,14 +62,14 @@ struct EstimateInfo {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct ConsensusState {
-    population_sample : PopulationSample,
-    estimate_info : EstimateInfo,
-    population_estimate_cache : HashMap<String, EstimateInfo>,
-    total_block_claim_count: u64,
-    validators: HashMap<String, ValidatorState>,
-    aggregate_chain_clock: f64,
-    aggregate_local_mean: f64,
-    population_samples: VecDeque< PopulationSample>,
+    pub population_sample : PopulationSample,
+    pub estimate_info : EstimateInfo,
+    pub population_estimate_cache : HashMap<String, EstimateInfo>,
+    pub total_block_claim_count: u64,
+    pub validators: HashMap<String, ValidatorState>,
+    pub aggregate_chain_clock: u64,
+    pub aggregate_local_mean: f64,
+    pub population_samples: VecDeque< PopulationSample>,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]

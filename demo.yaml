@@ -180,7 +180,7 @@ services:
       - rest-api-1
       - rest-api-2
     entrypoint: "bash -c \"\
-        sawtooth keygen && \
+        sawtooth keygen --force && \
         tail -f /dev/null \
         \""
 

@@ -19,9 +19,7 @@ use sawtooth_sdk::consensus::{engine::*,service::Service};
 use std::thread::sleep;
 use std::time;
 use std::time::Instant;
-
-use rand;
-use rand::Rng;
+use poet2_util;
 use enclave_sim as enclave;
 
 const DEFAULT_WAIT_TIME: u64 = 0;
@@ -171,46 +169,33 @@ impl Poet2Service {
             .expect("Failed to send block ack");
     }
 
-    // Calculate the time to wait between publishing blocks. This will be a
-    // random number between the settings sawtooth.consensus.min_wait_time and
-    // sawtooth.consensus.max_wait_time if max > min, else DEFAULT_WAIT_TIME. If
-    // there is an error parsing those settings, the time will be
-    // DEFAULT_WAIT_TIME.
-    pub fn calculate_wait_time(&mut self, chain_head_id: BlockId) -> time::Duration {
-        let settings_result = self.service.get_settings(
-            chain_head_id,
-            vec![
-                String::from("sawtooth.consensus.min_wait_time"),
-                String::from("sawtooth.consensus.max_wait_time"),
-            ],
-        );
+    pub fn get_wait_time(&mut self, chain_head: Block, validator_id: &Vec<u8>) -> u64
+    {
+        let mut duration64: u64 = 0_u64;
+        let mut prev_wait_certificate = String::new();
+        let mut prev_wait_certificate_sig = String::new();
 
-        let wait_time = if let Ok(settings) = settings_result {
-            let ints: Vec<u64> = vec![
-                settings.get("sawtooth.consensus.min_wait_time").unwrap(),
-                settings.get("sawtooth.consensus.max_wait_time").unwrap(),
-            ].iter()
-                .map(|string| string.parse::<u64>())
-                .map(|result| result.unwrap_or(0))
-                .collect();
+        debug!("Getting new wait time for next block.");
+        if chain_head.block_num != 0_u64 { // non-genesis block
+            let result =
+                 poet2_util::payload_to_wc_and_sig(chain_head.payload.clone());
+            prev_wait_certificate = result.0;
+            prev_wait_certificate_sig = result.1;
+        }
 
-            let min_wait_time: u64 = ints[0];
-            let max_wait_time: u64 = ints[1];
+        duration64 = enclave::initialize_wait_certificate(
+                              prev_wait_certificate,
+                              poet2_util::blockid_to_hex_string(
+                                          chain_head.previous_id),
+                              prev_wait_certificate_sig,
+                              &validator_id);
 
-            debug!("Min: {:?} -- Max: {:?}", min_wait_time, max_wait_time);
-
-            if min_wait_time >= max_wait_time {
-                DEFAULT_WAIT_TIME
-            } else {
-                rand::thread_rng().gen_range(min_wait_time, max_wait_time)
-            }
-        } else {
-            DEFAULT_WAIT_TIME
-        };
-
-        info!("Wait time: {:?}", wait_time);
-
-        time::Duration::from_secs(wait_time)
+        let minimum_duration : f64 = 1.0_f64;
+        let local_mean = 5.5_f64;
+        let wait_time = minimum_duration 
+                        - local_mean * ((duration64 as f64).log10()
+                        - (u64::max_value() as f64).log10());
+        return wait_time as u64;
     }
 
     pub fn get_setting(&mut self, block_id: BlockId, key:String) -> String {
@@ -231,35 +216,29 @@ impl Poet2Service {
     }
 
     pub fn get_setting_from_head(&mut self, key:String) ->  String {
-
         let head_id:BlockId = self.get_chain_head().block_id;
         self.get_setting( head_id, key )
     }
 
-    pub fn create_consensus(&mut self, summary: Vec<u8>, chain_head: Block, validator_id: Vec<u8>, new_block_id: BlockId) -> String {
-         //let mut consensus: Vec<u8> = vec![];
+    pub fn create_consensus(&mut self, summary: Vec<u8>, chain_head: Block, wait_time : u64) -> String {
+        let mut prev_wait_certificate_sig = String::new();
 
-         let mut head_block = chain_head.clone();
-         let head_wait_cert = head_block.payload;
-         let head_block_num = head_block.block_num;
+        if chain_head.block_num != 0_u64 { // not genesis block
+            prev_wait_certificate_sig =
+                poet2_util::payload_to_wc_and_sig(chain_head.payload.clone()).1;
+        }
 
-         // @TODO : Replace new_block_id with block_digest
-         info!("Block id returned is {:?}", Vec::from(new_block_id.clone()));
-         let (serial_cert, cert_signature) = enclave::create_wait_certificate(
-                 &new_block_id.clone(),
-                 String::from_utf8(head_wait_cert).expect("Found invalid UTF-8"),
-                 &summary.clone(),
-                 &validator_id,
-                 head_block_num+1,
-                 5.5_f64,
+         info!("Block id returned is {:?}", Vec::from(chain_head.block_id.clone()));
+         let (serial_cert, cert_signature) = enclave::finalize_wait_certificate(
+                 prev_wait_certificate_sig,
+                 poet2_util::to_hex_string(summary),
+                 wait_time
              );
 
-         serial_cert.clone()
-    }
-
-    pub fn get_next_wait_time( &mut self ) -> u64 {
-        debug!("Getting new wait time for next block.");
-        enclave::get_next_wait_time( 5.5_f64 )
+         let mut payload_to_send = serial_cert;
+         payload_to_send.push_str("#");
+         payload_to_send.push_str(&cert_signature); 
+         return payload_to_send.clone();
     }
 }
 

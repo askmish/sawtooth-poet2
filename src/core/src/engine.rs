@@ -27,10 +27,12 @@ use std::str::FromStr;
 use std::cmp;
 use serde_json;
 use std::time::Duration;
+use std::time::Instant;
 use enclave_sim::*;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap};
 use consensus_state::*;
 use consensus_state_store::{ConsensusStateStore, InMemoryConsensusStateStore};
+use poet2_util;
 
 const DEFAULT_BLOCK_CLAIM_LIMIT:i32 = 250;
 
@@ -43,8 +45,6 @@ impl Poet2Engine {
     }
 }
 
-static mut CLAIM_BLOCK_DUR : u64 = 0_u64;
-
 impl Engine for Poet2Engine {
     fn start(
         &mut self,
@@ -56,16 +56,13 @@ impl Engine for Poet2Engine {
         info!("Started PoET 2 Engine");
         let mut service = Poet2Service::new(service);
         let mut chain_head = startup_state.chain_head;
-        let mut wait_time = service.calculate_wait_time(chain_head.block_id.clone());
         let mut published_at_height = false;
-        let mut start = time::Instant::now();
-        unsafe {
-            CLAIM_BLOCK_DUR = service.get_next_wait_time();
-        }
+        let mut start = Instant::now();
         let validator_id = Vec::from(startup_state.local_peer_info.peer_id);
         let mut block_num_id_map:HashMap<u64, BlockId> = HashMap::new();
         let mut block_num:u64 = 0;
         let mut state_store = InMemoryConsensusStateStore::new();
+        let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id));
 
         create_signup_info();
 
@@ -76,7 +73,7 @@ impl Engine for Poet2Engine {
         // 3. Handle the message.
         // 4. Check for publishing.
         loop {
-            let incoming_message = updates.recv_timeout(time::Duration::from_millis(10));
+            let incoming_message = updates.recv_timeout(Duration::from_millis(10));
             match incoming_message {
                 Ok(update) => {
                     debug!("Received message: {:?}", update);
@@ -141,15 +138,13 @@ impl Engine for Poet2Engine {
                                 // Commiting or Resolving fork if one exists
                                 // Advance the chain if possible.
                                 let mut claim_block_dur:u64 = 0_u64;
-                                unsafe {
-                                    claim_block_dur = CLAIM_BLOCK_DUR.clone();
-                                }
+                                claim_block_dur = wait_time.clone().as_secs();
 
                                 // Current block points to current head
                                 // Check if block already claimed. Go on to
                                 // compare duration then. Accept one of them
                                 // and update it to be new chain head
-                                if block.block_num == 1+chain_head.block_num
+                                if block.block_num == (1 + chain_head.block_num)
                                       && block.previous_id == chain_head.block_id {
 
                                     let mut new_block_dur = get_cert_from(&block).wait_time;
@@ -282,10 +277,10 @@ impl Engine for Poet2Engine {
 
                         // The chain head was updated, so abandon the
                         // block in progress and start a new one.
-                        Update::BlockCommit(new_chain_head) => {
+                        Update::BlockCommit(new_chain_head_blockid) => {
                             info!(
                                 "Chain head updated to {:?}, abandoning block in progress",
-                                new_chain_head
+                                new_chain_head_blockid
                             );
 
                             service.cancel_block();
@@ -294,14 +289,15 @@ impl Engine for Poet2Engine {
                             // Need to get wait_time from certificate
                             // wait_time = service.calculate_wait_time(new_chain_head.clone());
                             published_at_height = false;
-                            start = time::Instant::now();
-                            unsafe {
-                                CLAIM_BLOCK_DUR = service.get_next_wait_time();
-                            }
-                            service.initialize_block(Some(new_chain_head));
+                            start = Instant::now();
+                            let chain_head_block = service.get_chain_head();
+                            wait_time = Duration::from_secs(service.get_wait_time(chain_head_block.clone(), &validator_id));
+
+                            service.initialize_block(Some(new_chain_head_blockid));
                         },
 
-                        Update::PeerMessage(message, sender_id) => match ResponseMessage::from_str(
+                        Update::PeerMessage(message, sender_id)
+                            => match ResponseMessage::from_str(
                             message.message_type.as_ref(),
                         ).unwrap()
                         {
@@ -324,12 +320,14 @@ impl Engine for Poet2Engine {
 
                             ResponseMessage::Ack => {
                                 let block_id = BlockId::from(message.content);
-                                info!("Received ack message from {:?}: {:?}", sender_id, block_id);
+                                info!("Received ack message from {:?}: {:?}",
+                                                         sender_id, block_id);
                             }
                         },
 
                         Update::BlockInvalid(block_id) => {
-                            info!("Invalid block received with block id : {:?}", block_id);
+                            info!("Invalid block received with block id : {:?}",
+                                                                      block_id);
                         },
                         _ => {}
                     }
@@ -343,25 +341,24 @@ impl Engine for Poet2Engine {
                 Err(RecvTimeoutError::Timeout) => {}
             }
 
-            if !published_at_height && time::Instant::now().duration_since(start) > wait_time {
+            if !published_at_height && Instant::now().duration_since(start) > wait_time {
                 info!("Timer expired -- publishing block");
+                debug!("wait time was : {:?} for chain head: {:?}", wait_time, chain_head.clone());
 
                 let summary = service.summarize_block();
                 let consensus: String = service.create_consensus(summary,
                                                                  chain_head.clone(),
-                                                                 validator_id.clone(),
-                                                                 BlockId::default());
+                                                                 wait_time.as_secs());
 
                 let new_block_id = service.finalize_block(consensus.as_bytes().to_vec());
-                let deserial_cert: WaitCertificate = serde_json::from_str(&consensus).unwrap();
+                service.broadcast(new_block_id.to_vec());
 
-                wait_time = Duration::from_secs(deserial_cert.wait_time);
+                let new_chain_head = service.get_chain_head();
+                wait_time = Duration::from_secs(service.get_wait_time(new_chain_head.clone(), &validator_id));
                 info!("New wait time is : {:?}",wait_time);
 
                 published_at_height = true;
 
-                //iservice.broadcast(serial_cert.as_bytes().to_vec());
-                service.broadcast(new_block_id.to_vec());
 
             }
         }
@@ -377,10 +374,11 @@ impl Engine for Poet2Engine {
     
 }
 
-fn get_cert_from(block:&Block) -> WaitCertificate {
-    let payload = &block.payload;
-    let payload_str = String::from_utf8(payload.to_vec()).expect("Found invalid UTF-8");
-    serde_json::from_str(&payload_str).unwrap()
+fn get_cert_from(block: &Block) -> WaitCertificate {
+    let mut payload = block.payload.clone();
+    let (wait_certificate, _) = poet2_util::payload_to_wc_and_sig(payload);
+    debug!("Got wait_cert : {:?}", &wait_certificate);
+    serde_json::from_str(&wait_certificate).unwrap()
 }
 
 pub fn to_hex_string(bytes: Vec<u8>) -> String {

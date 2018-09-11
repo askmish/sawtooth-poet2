@@ -1,9 +1,8 @@
-use sawtooth_sdk::consensus::{engine::*,service::Service};
+use sawtooth_sdk::consensus::{engine::*};
 use service::Poet2Service;
 use enclave_sim::WaitCertificate;
 //use consensus_state_store;
 use std::collections::VecDeque;
-use std::collections::HashSet;
 use std::collections::HashMap;
 
 use serde_derive;
@@ -169,9 +168,9 @@ impl ConsensusState{
     }
 
     pub fn validator_did_claim_block(&mut self, validator_info: &ValidatorInfo, wait_certificate: &WaitCertificate, poet_settings_view: &PoetSettingsView ) -> (){
-      self.aggregate_local_mean += wait_certificate.local_mean;
+      self.aggregate_local_mean += 5.5_f64; //wait_certificate.local_mean;
       self.total_block_claim_count += 1;
-      self.population_samples.push_back( PopulationSample{ wait_time: wait_certificate.wait_time , local_mean: wait_certificate.local_mean}); 
+      self.population_samples.push_back( PopulationSample{ wait_time: wait_certificate.wait_time , local_mean: 5.5_f64}); //wait_certificate.local_mean}); 
       while self.population_samples.len() > poet_settings_view.population_estimate_sample_size{
         self.population_samples.pop_front();
       }

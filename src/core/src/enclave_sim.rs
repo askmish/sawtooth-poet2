@@ -19,7 +19,6 @@ use std::sync::Mutex;
 use num::bigint::BigUint;
 use num::bigint::RandBigInt;
 use num::ToPrimitive;
-use std::f64;
 use std::vec::Vec;
 use std::string::String;
 use sawtooth_sdk::signing::secp256k1::Secp256k1PublicKey;
@@ -37,36 +36,49 @@ pub fn to_hex_string(bytes: Vec<u8>) -> String {
     strs.join("")
 }
 
-static mut NEXT_WAIT_TIME:u64 = 0_u64;
-lazy_static! {
-    static ref DURATION_HEX:Mutex<String> = Mutex::new(String::from("0"));
-}
-
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct WaitCertificate {
     pub duration_id : String,
-    pub wait_time :  u64,
-    pub local_mean : f64,
-    pub block_id : String,
+    pub poet_block_id : String,
     pub prev_block_id : String,
-    pub block_hash : String,
+    pub block_summary : String,
     pub block_number : u64,
     pub validator_id : String,
+    pub wait_time : u64
 }
 
 impl Default for WaitCertificate {
     fn default() -> WaitCertificate {
         WaitCertificate {
             duration_id   : String::new(),
-            wait_time     : 0_u64,
-            local_mean    : 0.0_f64,
-            block_id      : String::new(),
+            poet_block_id : String::new(),
             prev_block_id : String::new(),
-            block_hash    : String::new(),
+            block_summary : String::new(),
             block_number  : 0_u64, 
             validator_id  : String::new(),
+            wait_time     : 0_u64, // May be deprecated in later versions
         }
     }
+}
+
+static mut last_block_number : u64 = 0_u64;
+
+pub struct PoetCertMap {
+    poet_block_id : String,
+    wait_certificate : WaitCertificate,
+}
+
+impl Default for PoetCertMap {
+    fn default() -> PoetCertMap {
+        PoetCertMap { 
+	    poet_block_id : String::new(),
+	    wait_certificate : WaitCertificate::default(),
+        }
+    }
+}
+
+lazy_static! {
+    static ref POET_CERT_MAP:Mutex<PoetCertMap> = Mutex::new(PoetCertMap::default());
 }
 
 pub struct PoetKeyPair {
@@ -84,9 +96,9 @@ impl Default for PoetKeyPair {
 }
 
 lazy_static! {
-    static ref POETKEYPAIR: Mutex<PoetKeyPair> = Mutex::new(PoetKeyPair::default());
+    static ref POET_KEY_PAIR: Mutex<PoetKeyPair> = Mutex::new(PoetKeyPair::default());
 }
- 
+
 pub fn create_signup_info() {
     let context = Secp256k1Context::new();
     let mut poet_key_pair = PoetKeyPair::default();
@@ -96,7 +108,7 @@ pub fn create_signup_info() {
     let public_key = context.get_public_key(&*private_key).unwrap();
     poet_key_pair.public_key = public_key.as_hex();
 
-    let mut poetkeypair_handle = POETKEYPAIR.lock().unwrap();
+    let mut poetkeypair_handle = POET_KEY_PAIR.lock().unwrap();
     poetkeypair_handle.private_key = poet_key_pair.private_key;
     poetkeypair_handle.public_key = poet_key_pair.public_key;
     info!("Created poet public/private key pair.");
@@ -108,71 +120,85 @@ fn truncate_biguint_to_u64(num: &BigUint) -> u64 {
     (num & mask).to_u64().unwrap()
 }
 
-pub fn get_next_wait_time( in_local_mean: f64 ) -> u64{
+pub fn initialize_wait_certificate(
+    in_serialized_prev_block_wait_certificate : String,
+    in_prev_block_id : String,
+    in_poet_block_id : String,
+    in_validator_id : &Vec<u8>,
+    ) -> u64 // duration
+{
+    let mut poet_cert_map_handle = POET_CERT_MAP.lock().unwrap();
+    if !poet_cert_map_handle.poet_block_id.is_empty() {
+        return 0_u64;
+    }
+
     let mut rng = rand::thread_rng();
     let duration = rng.gen_biguint(256);
-    let minimum_duration : f64 = 1.0_f64;
     let duration64 = truncate_biguint_to_u64(&duration);
-    let wait_time = minimum_duration - in_local_mean * ((duration64 as f64).log10()
-                        - (u64::max_value() as f64).log10());
-    unsafe{
-        *DURATION_HEX.lock().unwrap() = duration.to_str_radix(16);
-        NEXT_WAIT_TIME = wait_time as u64;
-    }
-    wait_time as u64
-}
+    let mut prev_block_number = 0_u64;
 
-pub fn create_wait_certificate(
-    in_block_id: &Vec<u8>,
-    in_serialized_prev_wait_certificate: String,
-    in_block_digest: &Vec<u8>,
-    in_validator_id: &Vec<u8>,
-    in_block_number: u64,
-    in_local_mean: f64)
-    -> (String, String)
-{
-    let mut wait_time:u64 = 0_u64;
-    let mut duration:String;
-    unsafe{
-        wait_time = NEXT_WAIT_TIME;
-        duration = DURATION_HEX.lock().unwrap().to_string();
-    }
 
-    let mut prev_block_id = String::new();
-    if !in_serialized_prev_wait_certificate.is_empty() {
-
-        let deserialized_prev_cert = serde_json::from_str(&in_serialized_prev_wait_certificate);
-        let mut prev_wait_certificate : WaitCertificate = WaitCertificate::default();
-        if deserialized_prev_cert.is_ok(){
-            prev_wait_certificate = deserialized_prev_cert.unwrap();
-            prev_block_id = prev_wait_certificate.block_id.to_owned();
-        }
-        else {
-            prev_block_id = String::from("0");
+    if !in_serialized_prev_block_wait_certificate.is_empty() {
+        let deserialized_prev_block_wait_certificate =
+               serde_json::from_str(&in_serialized_prev_block_wait_certificate);
+        let mut prev_wait_certificate_obj : WaitCertificate =
+               WaitCertificate::default();
+        
+        if deserialized_prev_block_wait_certificate.is_ok() {
+            prev_wait_certificate_obj =
+               deserialized_prev_block_wait_certificate.unwrap();
+            prev_block_number =
+               prev_wait_certificate_obj.block_number.to_owned();
         }
     }
 
     let out_wait_certificate = WaitCertificate {
-        duration_id  : duration.to_owned(), // store durationId as hex string
-        wait_time    : (wait_time as u64).to_owned(),
-        local_mean   : in_local_mean.to_owned(),
-        block_id     : to_hex_string(in_block_id.to_vec()),
-        prev_block_id : prev_block_id.to_owned(),
-        block_hash   : to_hex_string(in_block_digest.to_vec()),
-        block_number : in_block_number.to_owned(),
-        validator_id : to_hex_string(in_validator_id.to_vec())
+        duration_id  : duration.to_str_radix(16).to_owned(), // store as hex str
+        poet_block_id : in_poet_block_id.clone(),
+        prev_block_id : in_prev_block_id.clone(),
+        block_summary : String::new(), 
+        block_number : (prev_block_number + 1),
+        validator_id : to_hex_string(in_validator_id.to_vec()),
+        wait_time : 0_u64,
     };
 
-    let out_serialized_wait_certificate = serde_json::to_string(&out_wait_certificate).unwrap();
+    poet_cert_map_handle.poet_block_id = in_poet_block_id.clone();
+    poet_cert_map_handle.wait_certificate = out_wait_certificate.to_owned();
 
-    let poet_private_key_str = POETKEYPAIR.lock().unwrap().private_key.to_string();
+    return duration64;
+}
+
+pub fn finalize_wait_certificate(
+    in_poet_block_id: String,
+    in_block_summary: String,
+    in_wait_time: u64)
+    -> (String, String)
+{
+    let mut poet_cert_map_handle = POET_CERT_MAP.lock().unwrap();
+    if poet_cert_map_handle.poet_block_id != in_poet_block_id {
+       return (String::new(), String::new());
+    }
+
+    let mut out_wait_certificate =
+            poet_cert_map_handle.wait_certificate.to_owned();
+    out_wait_certificate.block_summary = in_block_summary.to_owned();
+    out_wait_certificate.wait_time = (in_wait_time as u64).to_owned();
+
+    let out_serialized_wait_certificate =
+            serde_json::to_string(&out_wait_certificate).unwrap();
+    
+    let poet_private_key_str =
+            POET_KEY_PAIR.lock().unwrap().private_key.to_string();
     let context = create_context("secp256k1").unwrap();
     let poet_private_key = Secp256k1PrivateKey::from_hex(&poet_private_key_str).unwrap();
 
     let wc = out_serialized_wait_certificate.clone();
 
     let out_wait_certificate_signature = context.sign(&wc.into_bytes(), &poet_private_key).unwrap();
-    info!("Created new Wait Certificate for BlockId : {:?}", in_block_id.clone());
+
+    info!("Created new Wait Certificate for BlockId : {:?}", in_poet_block_id.clone());
+
+    poet_cert_map_handle.poet_block_id = String::new();
     return (out_serialized_wait_certificate, out_wait_certificate_signature);
 }
 
@@ -180,7 +206,7 @@ pub fn verify_wait_certificate(
     in_serialized_wait_certificate: &String,
     in_wait_certificate_signature: &String) -> bool {
         let context = create_context("secp256k1").unwrap();
-        let poet_public_key_str = &POETKEYPAIR.lock().unwrap().public_key;
+        let poet_public_key_str = &POET_KEY_PAIR.lock().unwrap().public_key;
         let poet_public_key = Secp256k1PublicKey::from_hex(&poet_public_key_str).unwrap();
         let wc = in_serialized_wait_certificate.clone();
         let verify = context.verify(&in_wait_certificate_signature, &wc.into_bytes(), &poet_public_key).unwrap();

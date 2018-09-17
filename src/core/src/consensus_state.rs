@@ -18,7 +18,7 @@ use serde_json;
 *      validator has claimed
 *
 */
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(  Clone, Debug, PartialEq, Default)]
 pub struct ValidatorState {
     key_block_claim_count : u64,
     poet_public_key : String,
@@ -33,7 +33,7 @@ pub struct ValidatorState {
 * local_mean (float): The local mean from a wait certificate/timer
 */
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(  Clone, Debug, PartialEq, Default)]
 pub struct PopulationSample {
     wait_time: u64,
     local_mean: f64
@@ -52,14 +52,14 @@ pub struct PopulationSample {
 *     block
 *
 */
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(  Clone, Debug, PartialEq, Default)]
 pub struct EstimateInfo {
-    population_estimate : f64,
-    previous_block_id: String,
-    validator_id: String
+    pub population_estimate : f64,
+    pub previous_block_id: BlockId,
+    pub validator_id: String
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(  Clone, Debug, PartialEq, Default)]
 pub struct ConsensusState {
     pub population_sample : PopulationSample,
     pub estimate_info : EstimateInfo,

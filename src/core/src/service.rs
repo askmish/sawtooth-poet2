@@ -61,17 +61,16 @@ impl Poet2Service {
 
     pub fn get_block(&mut self, block_id: BlockId) -> Result<Block, Error> {
         debug!("Getting block {:?}", block_id);
-        let block = self.service
-            .get_blocks(vec![block_id.clone()])
-            .expect("Failed to get block")
-            .remove(&block_id); //remove from the returned hashmap to get value
-        match block {
-            None => {
-                debug!("Could not get a block with id {:?}", block_id.clone());
+        let blocks = self.service
+            .get_blocks(vec![block_id.clone()]);
+        match blocks {
+            Err(err) => {
+                warn!("Could not get a block with id {:?}", block_id.clone());
                 Err(Error::UnknownBlock(format!("Block not found for id {:?}", block_id.clone())))
             }
-            Some(b) => {
-                Ok(b)
+            Ok(mut block_map) => {
+                //remove from the returned hashmap to get value
+                Ok(block_map.remove(&block_id).unwrap())
             }
         }
     }

@@ -17,6 +17,7 @@
 
 use std::collections::HashMap;
 use consensus_state::ConsensusState;
+use sawtooth_sdk::consensus::engine::BlockId;
 
 #[derive(Debug)]
 pub enum ConsensusStateStoreError {
@@ -27,17 +28,17 @@ pub enum ConsensusStateStoreError {
 pub trait ConsensusStateStore {
     fn get<'a>(
         &'a self,
-        block_id: &str,
+        block_id: BlockId,
     ) -> Result<Box<ConsensusState>, ConsensusStateStoreError>;
 
-    fn delete(&mut self, block_id: &str) -> Result<ConsensusState, ConsensusStateStoreError>;
+    fn delete(&mut self, block_id: BlockId) -> Result<ConsensusState, ConsensusStateStoreError>;
 
-    fn put(&mut self, block_id: &str, consensus_state: ConsensusState) -> Result<(), ConsensusStateStoreError>;
+    fn put(&mut self, block_id: BlockId, consensus_state: ConsensusState) -> Result<(), ConsensusStateStoreError>;
 }
 
 #[derive(Default)]
 pub struct InMemoryConsensusStateStore {
-    consensus_state_map: HashMap<String, ConsensusState>,
+    consensus_state_map: HashMap<BlockId, ConsensusState>,
 }
 
 impl InMemoryConsensusStateStore {
@@ -49,44 +50,45 @@ impl InMemoryConsensusStateStore {
 impl ConsensusStateStore for InMemoryConsensusStateStore {
     fn get<'a>(
         &'a self,
-        block_id: &str,
+        block_id: BlockId,
     ) -> Result<Box<ConsensusState>, ConsensusStateStoreError> {
-        let state = self.consensus_state_map.get(block_id);
+        let state = self.consensus_state_map.get(&block_id);
         match state {
             None => {
-                trace!("No state found for block_id : {}", block_id);
+                error!("No state found for block_id : {:?}", block_id);
                 Err(ConsensusStateStoreError::UnknownConsensusState)
             },
             Some(consensus_state) => {
-                trace!("Found state for block_id : {}", block_id);
+                error!("Found state for block_id : {:?}", block_id);
                 Ok(Box::new(consensus_state.clone()))
             }
         }
     }
 
-    fn delete(&mut self, block_id: &str) -> Result<ConsensusState, ConsensusStateStoreError>{
-        let value = self.consensus_state_map.remove(block_id);
+    fn delete(&mut self, block_id: BlockId) -> Result<ConsensusState, ConsensusStateStoreError>{
+        let value = self.consensus_state_map.remove(&block_id);
+        error!("Size of map is {}", self.consensus_state_map.len());
         match value {
             None => {
-                trace!("No state found for block_id : {}", block_id);
+                error!("No state found for block_id : {:?}", block_id);
                 Err(ConsensusStateStoreError::UnknownConsensusState)
             },
             Some(consensus_state) => {
-                trace!("Deleted state for block_id : {}", block_id);
+                error!("Deleted state for block_id : {:?}", block_id);
                 Ok(consensus_state)
             }
         }
 
     }
 
-    fn put(&mut self, block_id: &str, consensus_state: ConsensusState) -> Result<(), ConsensusStateStoreError>{
-        let value = self.consensus_state_map.insert(block_id.to_string(), consensus_state);
+    fn put(&mut self, block_id: BlockId, consensus_state: ConsensusState) -> Result<(), ConsensusStateStoreError>{
+        let value = self.consensus_state_map.insert(block_id.clone(), consensus_state);
         match value {
             None => {
-                trace!("New [key,value] inserted for  block_id : {}", block_id);
+                error!("New [key,value] inserted for  block_id : {:?}", block_id.clone());
             },
             Some(consensus_state) => {
-                trace!("Updated state for block_id : {}", block_id);
+                error!("Updated state for block_id : {:?}", block_id);
             }
         }
         Ok(())

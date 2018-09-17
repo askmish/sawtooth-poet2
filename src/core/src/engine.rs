@@ -96,32 +96,6 @@ impl Engine for Poet2Engine {
                         Update::BlockValid(block_id) => {
                             let block_ = service.get_block(block_id.clone());
 
-                            /*if block_.is_ok(){
-
-                                let block = block_.unwrap();
-                                service.send_block_received(&block);
-
-                                chain_head = service.get_chain_head();
-
-                                info!(
-                                    "Choosing between chain heads -- current: {:?} -- new: {:?}",
-                                    chain_head, block
-                                );
-
-                                // Advance the chain if possible.
-                                if block.block_num > chain_head.block_num
-                                    || (block.block_num == chain_head.block_num
-                                        && block.block_id > chain_head.block_id)
-                                {
-                                    info!("Committing {:?}", block);
-                                    service.commit_block(block_id.clone());
-                                    block_num_id_map.insert(block_num, block_id);
-                                    block_num += 1;
-                                } else {
-                                    info!("Ignoring {:?}", block);
-                                    service.ignore_block(block_id);
-                                }
-                           }*/
                             if block_.is_ok(){
 
                                 let block = block_.unwrap();
@@ -157,8 +131,13 @@ impl Engine for Poet2Engine {
                                                         get_cert_from(&block).wait_time;
                                         let mut state = ConsensusState::default();
                                         state.aggregate_chain_clock = agg_chain_clock;
-                                        trace!("Storing cummulative cc = {}", agg_chain_clock);
-                                        state_store.put(&to_hex_string(Vec::from(block_id.clone())), state);
+                                        state.estimate_info = EstimateInfo{
+                                            population_estimate : 0_f64,
+                                            previous_block_id   : block.previous_id.clone(),
+                                            validator_id        : String::from("validator-1"),
+                                        };
+                                        error!("Storing cummulative cc = {}", agg_chain_clock);
+                                        state_store.put(block_id.clone(), state);
                                         service.set_chain_clock(agg_chain_clock);
                                         service.commit_block(block_id);
                                     }
@@ -173,8 +152,7 @@ impl Engine for Poet2Engine {
                                 else if prev_block_.is_ok(){
                                     let prev_block = prev_block_.unwrap();
 
-                                    if state_store.get(&to_hex_string(
-                                                  Vec::from(prev_block.block_id))).is_err() {
+                                    if state_store.get(prev_block.block_id).is_err() {
                                         let mut cache_block = block.clone();
                                         let mut block_state;
                                         let mut block_state_;
@@ -209,8 +187,7 @@ impl Engine for Poet2Engine {
                                                 // Keep account of the chainclocks from cache.
                                                 // Once common ancestor is found, compare the
                                                 // chainclocks of the forks to choose a fork
-                                                block_state_ = state_store.get(&to_hex_string(
-                                                       Vec::from(cache_block.block_id)));
+                                                block_state_ = state_store.get(cache_block.block_id.clone());
                                                 if block_state_.is_ok() {
                                                     // Found common ancestor
                                                     info!("Found a common ancestor at block {:?}",block.clone());
@@ -230,6 +207,7 @@ impl Engine for Poet2Engine {
                                         let mut chain_cc:u64 = 0;
                                         if ancestor_found {
                                             debug!("Found a common ancestor. Comparing length.");
+                                            error!("Upto head = {}, Common ancestor = {}", cc_upto_head, cc_upto_ancestor);
                                             chain_cc = cc_upto_head - cc_upto_ancestor;
                                             let mut chain_len:u64 = chain_head.block_num - cache_block.block_num;
                                             if chain_len > fork_len {
@@ -252,18 +230,27 @@ impl Engine for Poet2Engine {
                                         }
                                         if fork_won {
                                             info!("Switching to fork.");
-                                            let mut agg_chain_clock = cc_upto_ancestor + fork_cc; // fork_cc is inclusive of new block 
+                                            // fork_cc is inclusive of new block
+                                            let mut agg_chain_clock = cc_upto_ancestor + fork_cc;
                                             let mut state = ConsensusState::default();
                                             state.aggregate_chain_clock = agg_chain_clock;
-                                            trace!("Aggregate chain clock upto common ancestor = {} 
-                                                    Fork chain clock = {}. After switch aggregate = {}", 
+                                            error!("Aggregate chain clock upto common ancestor = {}
+                                                    Fork chain clock = {}. After switch aggregate = {}",
                                                     cc_upto_ancestor, fork_cc, agg_chain_clock);
-                                            trace!("Storing cummulative cc = {}", agg_chain_clock);
-                                            state_store.put(&to_hex_string(Vec::from(block_id.clone())), state);
+                                            error!("Storing cummulative cc = {}", agg_chain_clock);
+                                            state.estimate_info = EstimateInfo{
+                                                population_estimate : 0_f64,
+                                                previous_block_id   : block.previous_id.clone(),
+                                                validator_id        : String::from("validator-1"),
+                                            };
+                                            state_store.put(block_id.clone(), state);
                                             service.set_chain_clock(agg_chain_clock);
                                             service.commit_block(block_id);
                                             // Mark all blocks upto common ancestor
                                             // in the chain as invalid.
+                                            // Delete states for all blocks not in chain
+                                            delete_states_upto( cache_block.block_id , chain_head.clone().block_id,
+                                                                &mut service, &mut state_store );
                                         }
                                         else {
                                             info!("Not switching to fork");
@@ -501,6 +488,31 @@ fn validator_is_claiming_too_early( service: &mut Poet2Service )->bool
     }
     return false;
 
+}
+
+fn delete_states_upto( ancestor: BlockId, head: BlockId, 
+                       service: &mut Poet2Service, state_store: &mut ConsensusStateStore ) -> ()
+{
+    let mut state_ = state_store.get(head.clone());
+    let mut next = state_.unwrap().estimate_info.previous_block_id;
+    state_store.delete(head);
+    loop {
+        if ancestor == next {
+            break;
+        }
+        state_ = state_store.get(next.clone());
+        error!("Deleting state for {:?}", next.clone());
+        state_store.delete(next.clone());
+        if state_.is_err() {
+            let block_ = service.get_block(next);
+            if block_.is_ok(){
+                let block = block_.unwrap();
+                next = block.previous_id;
+                continue;
+            }
+        } 
+        next = state_.unwrap().estimate_info.previous_block_id;
+    }
 }
 
 pub enum ResponseMessage {

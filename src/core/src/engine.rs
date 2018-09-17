@@ -126,6 +126,7 @@ impl Engine for Poet2Engine {
                                     if new_block_dur <= claim_block_dur{
                                         info!("Discarding the block in progress.");
                                         service.cancel_block();
+                                        published_at_height = true;
                                         info!("New block extends current chain. Committing {:?}", block);
                                         let mut agg_chain_clock = service.get_chain_clock() +
                                                         get_cert_from(&block).wait_time;
@@ -136,7 +137,8 @@ impl Engine for Poet2Engine {
                                             previous_block_id   : block.previous_id.clone(),
                                             validator_id        : String::from("validator-1"),
                                         };
-                                        error!("Storing cummulative cc = {}", agg_chain_clock);
+                                        debug!("Storing cummulative cc = {} for blockId : {:?}",
+                                                 agg_chain_clock, block_id.clone());
                                         state_store.put(block_id.clone(), state);
                                         service.set_chain_clock(agg_chain_clock);
                                         service.commit_block(block_id);
@@ -206,8 +208,9 @@ impl Engine for Poet2Engine {
                                         let mut fork_won = false;
                                         let mut chain_cc:u64 = 0;
                                         if ancestor_found {
-                                            debug!("Found a common ancestor. Comparing length.");
-                                            error!("Upto head = {}, Common ancestor = {}", cc_upto_head, cc_upto_ancestor);
+                                            info!("Found a common ancestor. Comparing length.");
+                                            debug!("Chain clocks upto head = {}, upto common ancestor = {}",
+                                                    cc_upto_head, cc_upto_ancestor);
                                             chain_cc = cc_upto_head - cc_upto_ancestor;
                                             let mut chain_len:u64 = chain_head.block_num - cache_block.block_num;
                                             if chain_len > fork_len {
@@ -229,19 +232,22 @@ impl Engine for Poet2Engine {
                                             }
                                         }
                                         if fork_won {
+                                            info!("Discarding the block in progress.");
+                                            service.cancel_block();
+                                            published_at_height = true;
                                             info!("Switching to fork.");
                                             // fork_cc is inclusive of new block
                                             let mut agg_chain_clock = cc_upto_ancestor + fork_cc;
                                             let mut state = ConsensusState::default();
                                             state.aggregate_chain_clock = agg_chain_clock;
-                                            error!("Aggregate chain clock upto common ancestor = {}
+                                            debug!("Aggregate chain clock upto common ancestor = {}
                                                     Fork chain clock = {}. After switch aggregate = {}",
                                                     cc_upto_ancestor, fork_cc, agg_chain_clock);
-                                            error!("Storing cummulative cc = {}", agg_chain_clock);
+                                            debug!("Storing cummulative cc = {}", agg_chain_clock);
                                             state.estimate_info = EstimateInfo{
                                                 population_estimate : 0_f64,
                                                 previous_block_id   : block.previous_id.clone(),
-                                                validator_id        : String::from("validator-1"),
+                                                validator_id        : String::from("validator-1"),//Stubbed
                                             };
                                             state_store.put(block_id.clone(), state);
                                             service.set_chain_clock(agg_chain_clock);
@@ -249,8 +255,9 @@ impl Engine for Poet2Engine {
                                             // Mark all blocks upto common ancestor
                                             // in the chain as invalid.
                                             // Delete states for all blocks not in chain
+                                            let mut chain_len_to_delete = chain_head.block_num - cache_block.block_num;
                                             delete_states_upto( cache_block.block_id , chain_head.clone().block_id,
-                                                                &mut service, &mut state_store );
+                                                               chain_len_to_delete,  &mut service, &mut state_store );
                                         }
                                         else {
                                             info!("Not switching to fork");
@@ -490,28 +497,32 @@ fn validator_is_claiming_too_early( service: &mut Poet2Service )->bool
 
 }
 
-fn delete_states_upto( ancestor: BlockId, head: BlockId, 
+fn delete_states_upto( ancestor: BlockId, head: BlockId, delete_len: u64,
                        service: &mut Poet2Service, state_store: &mut ConsensusStateStore ) -> ()
 {
-    let mut state_ = state_store.get(head.clone());
-    let mut next = state_.unwrap().estimate_info.previous_block_id;
-    state_store.delete(head);
+    let mut next = head;
+    let mut count = 0_u64;
     loop {
-        if ancestor == next {
+        if ancestor == next || count >= delete_len {
             break;
         }
-        state_ = state_store.get(next.clone());
-        error!("Deleting state for {:?}", next.clone());
-        state_store.delete(next.clone());
+        count += 1;
+        let mut state_ = state_store.get(next.clone());
         if state_.is_err() {
+            debug!("State not found. Getting block via service.");
             let block_ = service.get_block(next);
             if block_.is_ok(){
                 let block = block_.unwrap();
                 next = block.previous_id;
                 continue;
             }
-        } 
-        next = state_.unwrap().estimate_info.previous_block_id;
+            break;
+        }
+        else {
+            debug!("Deleting state for {:?}", next.clone());
+            state_store.delete(next.clone());
+            next = state_.unwrap().estimate_info.previous_block_id;
+        }
     }
 }
 

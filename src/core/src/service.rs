@@ -87,7 +87,7 @@ impl Poet2Service {
         debug!("Summarizing block");
         let mut summary = self.service.summarize_block();
         while let Err(Error::BlockNotReady) = summary {
-           warn!("Block not ready to summarize");
+           debug!("Block not ready to summarize");
            sleep(time::Duration::from_secs(1));
            summary = self.service.summarize_block();
         }
@@ -192,9 +192,12 @@ impl Poet2Service {
 
         let minimum_duration : f64 = 1.0_f64;
         let local_mean = 5.5_f64;
-        let wait_time = minimum_duration 
-                        - local_mean * ((duration64 as f64).log10()
-                        - (u64::max_value() as f64).log10());
+        let tagd = (duration64 as f64) / (u64::max_value() as f64);
+        let mut wait_time = minimum_duration
+                            - local_mean * tagd.log10();
+        if wait_time as u64 == 0_u64 {
+             wait_time = minimum_duration; 
+        }
         return wait_time as u64;
     }
 
@@ -227,7 +230,6 @@ impl Poet2Service {
             prev_wait_certificate_sig =
                 poet2_util::payload_to_wc_and_sig(chain_head.payload.clone()).1;
         }
-
          info!("Block id returned is {:?}", Vec::from(chain_head.block_id.clone()));
          let (serial_cert, cert_signature) = enclave::finalize_wait_certificate(
                  prev_wait_certificate_sig,

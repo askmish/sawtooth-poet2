@@ -63,6 +63,7 @@ impl Engine for Poet2Engine {
         let mut block_num:u64 = 0;
         let mut state_store = InMemoryConsensusStateStore::new();
         let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id));
+        let mut prev_wait_time = 0;
 
         create_signup_info();
 
@@ -112,7 +113,9 @@ impl Engine for Poet2Engine {
                                 // Commiting or Resolving fork if one exists
                                 // Advance the chain if possible.
                                 let mut claim_block_dur:u64 = 0_u64;
-                                claim_block_dur = wait_time.clone().as_secs();
+                                claim_block_dur = prev_wait_time;
+
+                                let mut new_block_dur = get_cert_from(&block).wait_time;
 
                                 // Current block points to current head
                                 // Check if block already claimed. Go on to
@@ -121,21 +124,22 @@ impl Engine for Poet2Engine {
                                 if block.block_num == (1 + chain_head.block_num)
                                       && block.previous_id == chain_head.block_id {
 
-                                    let mut new_block_dur = get_cert_from(&block).wait_time;
-                                    debug!("New block duration {} Claim block duration {}", new_block_dur, claim_block_dur);
+                                    debug!("New block duration {} Claim block duration {}",
+                                               new_block_dur, claim_block_dur);
                                     if new_block_dur <= claim_block_dur{
                                         info!("Discarding the block in progress.");
                                         service.cancel_block();
                                         published_at_height = true;
                                         info!("New block extends current chain. Committing {:?}", block);
                                         let mut agg_chain_clock = service.get_chain_clock() +
-                                                        get_cert_from(&block).wait_time;
+                                                                    new_block_dur;
                                         let mut state = ConsensusState::default();
                                         state.aggregate_chain_clock = agg_chain_clock;
                                         state.estimate_info = EstimateInfo{
                                             population_estimate : 0_f64,
                                             previous_block_id   : block.previous_id.clone(),
-                                            validator_id        : String::from("validator-1"),
+                                            validator_id        : to_hex_string(Vec::from(
+                                                                      block.signer_id.clone())),
                                         };
                                         debug!("Storing cummulative cc = {} for blockId : {:?}",
                                                  agg_chain_clock, block_id.clone());
@@ -159,7 +163,7 @@ impl Engine for Poet2Engine {
                                         let mut block_state;
                                         let mut block_state_;
                                         let mut cc_upto_head = service.get_chain_clock();
-                                        let mut fork_cc:u64 = get_cert_from(&cache_block).wait_time;
+                                        let mut fork_cc:u64 = new_block_dur;
                                         let mut fork_len:u64 = 1;
                                         let mut cc_upto_ancestor = 0_u64;
                                         let mut ancestor_found:bool = false;
@@ -247,7 +251,8 @@ impl Engine for Poet2Engine {
                                             state.estimate_info = EstimateInfo{
                                                 population_estimate : 0_f64,
                                                 previous_block_id   : block.previous_id.clone(),
-                                                validator_id        : String::from("validator-1"),//Stubbed
+                                                validator_id        : to_hex_string(Vec::from(
+                                                                          block.signer_id.clone())),
                                             };
                                             state_store.put(block_id.clone(), state);
                                             service.set_chain_clock(agg_chain_clock);
@@ -349,6 +354,7 @@ impl Engine for Poet2Engine {
                 service.broadcast(new_block_id.to_vec());
 
                 let new_chain_head = service.get_chain_head();
+                prev_wait_time = wait_time.clone().as_secs();
                 wait_time = Duration::from_secs(service.get_wait_time(new_chain_head.clone(), &validator_id));
                 info!("New wait time is : {:?}",wait_time);
 
@@ -371,8 +377,9 @@ impl Engine for Poet2Engine {
 
 fn get_cert_from(block: &Block) -> WaitCertificate {
     let mut payload = block.payload.clone();
+    debug!("Extracted payload from block: {:?}", payload.clone());
     let (wait_certificate, _) = poet2_util::payload_to_wc_and_sig(payload);
-    debug!("Got wait_cert : {:?}", &wait_certificate);
+    debug!("Serialized wait_cert : {:?}", &wait_certificate);
     serde_json::from_str(&wait_certificate).unwrap()
 }
 

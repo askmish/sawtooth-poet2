@@ -55,11 +55,11 @@ impl ConsensusStateStore for InMemoryConsensusStateStore {
         let state = self.consensus_state_map.get(&block_id);
         match state {
             None => {
-                error!("No state found for block_id : {:?}", block_id);
+                warn!("No state found for block_id : {:?}", block_id);
                 Err(ConsensusStateStoreError::UnknownConsensusState)
             },
             Some(consensus_state) => {
-                error!("Found state for block_id : {:?}", block_id);
+                debug!("Found state for block_id : {:?}", block_id);
                 Ok(Box::new(consensus_state.clone()))
             }
         }
@@ -67,14 +67,13 @@ impl ConsensusStateStore for InMemoryConsensusStateStore {
 
     fn delete(&mut self, block_id: BlockId) -> Result<ConsensusState, ConsensusStateStoreError>{
         let value = self.consensus_state_map.remove(&block_id);
-        error!("Size of map is {}", self.consensus_state_map.len());
         match value {
             None => {
-                error!("No state found for block_id : {:?}", block_id);
+                warn!("No state found for block_id : {:?}", block_id);
                 Err(ConsensusStateStoreError::UnknownConsensusState)
             },
             Some(consensus_state) => {
-                error!("Deleted state for block_id : {:?}", block_id);
+                debug!("Deleted state for block_id : {:?}", block_id);
                 Ok(consensus_state)
             }
         }
@@ -85,10 +84,10 @@ impl ConsensusStateStore for InMemoryConsensusStateStore {
         let value = self.consensus_state_map.insert(block_id.clone(), consensus_state);
         match value {
             None => {
-                error!("New [key,value] inserted for  block_id : {:?}", block_id.clone());
+                debug!("New [key,value] inserted for  block_id : {:?}", block_id.clone());
             },
             Some(consensus_state) => {
-                error!("Updated state for block_id : {:?}", block_id);
+                debug!("Updated state for block_id : {:?}", block_id);
             }
         }
         Ok(())

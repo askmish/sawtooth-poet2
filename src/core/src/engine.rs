@@ -342,12 +342,13 @@ impl Engine for Poet2Engine {
             }
 
             if !published_at_height && Instant::now().duration_since(start) > wait_time {
+                let cur_chain_head = service.get_chain_head();
                 info!("Timer expired -- publishing block");
-                debug!("wait time was : {:?} for chain head: {:?}", wait_time, chain_head.clone());
+                debug!("wait time was : {:?} for chain head: {:?}", wait_time, cur_chain_head.clone());
 
                 let summary = service.summarize_block();
                 let consensus: String = service.create_consensus(summary,
-                                                                 chain_head.clone(),
+                                                                 cur_chain_head.clone(),
                                                                  wait_time.as_secs());
 
                 let new_block_id = service.finalize_block(consensus.as_bytes().to_vec());

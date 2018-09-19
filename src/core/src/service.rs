@@ -135,9 +135,10 @@ impl Poet2Service {
 
     pub fn cancel_block(&mut self) {
         debug!("Cancelling block");
+        //TODO Handle InvalidState better
         match self.service.cancel_block() {
-            Ok(_) => {}
-            Err(Error::InvalidState(_)) => {}
+            Ok(_) => {enclave::cancel_wait_certificate();}
+            Err(Error::InvalidState(_)) => {enclave::cancel_wait_certificate();}
             Err(err) => {
                 panic!("Failed to cancel block: {:?}", err);
             }
@@ -186,7 +187,7 @@ impl Poet2Service {
         duration64 = enclave::initialize_wait_certificate(
                               prev_wait_certificate,
                               poet2_util::blockid_to_hex_string(
-                                          chain_head.previous_id),
+                                          chain_head.block_id),
                               prev_wait_certificate_sig,
                               &validator_id);
 

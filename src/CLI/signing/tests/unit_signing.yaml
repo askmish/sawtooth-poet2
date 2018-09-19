@@ -17,23 +17,18 @@ version: "2.1"
 
 services:
 
-  validator-registry-tp:
-    container_name: validator-registry-tp
+  unit-signing:
     build:
-      context: ./
-      dockerfile: ./poet2-engine.dockerfile
-      args:
-        - http_proxy
-        - https_proxy
-        - no_proxy
-    expose:
-      - 4004
+      context: ../..
+      dockerfile: signing/tests/signing-tests.dockerfile
+    image: signing-tests:$ISOLATION_ID
     volumes:
-      - ./src/validator-registry-tp:/project/validator-registry-tp/
-    working_dir: '/project/validator-registry-tp'
-    entrypoint: "bash -c \"rm -rf /project/validator-registry-tp/bin &&\
-	mkdir -p ./bin/ &&\
-	cd /project/validator-registry-tp &&\ 
-	cargo build --release && cp ./target/release/validator_registry_tp ./bin/validator_registry_tp &&\
-	cargo run --bin validator_registry_tp -- -vvv --connect tcp://validator:4004 && tail -f /dev/null \""
-    stop_signal: SIGKILL
+      - $SAWTOOTH_CORE:/project/sawtooth-core
+    command: nose2-3
+        -c /project/sawtooth-core/signing/nose2.cfg
+        -v
+        -s /project/sawtooth-core/signing
+    environment:
+        PYTHONPATH: "\
+          /project/sawtooth-core/signing:\
+          "

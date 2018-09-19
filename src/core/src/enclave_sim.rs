@@ -202,6 +202,12 @@ pub fn finalize_wait_certificate(
     return (out_serialized_wait_certificate, out_wait_certificate_signature);
 }
 
+pub fn cancel_wait_certificate() {
+    let mut poet_cert_map_handle = POET_CERT_MAP.lock().unwrap();
+    poet_cert_map_handle.poet_block_id = String::new();
+    poet_cert_map_handle.wait_certificate = WaitCertificate::default();
+}
+
 pub fn verify_wait_certificate(
     in_serialized_wait_certificate: &String,
     in_wait_certificate_signature: &String) -> bool {

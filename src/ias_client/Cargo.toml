@@ -1,0 +1,27 @@
+[package]
+name = "ias_client"
+version = "0.1.0"
+authors = ["Intel Corporation"]
+description = "Client code to connect to IAS"
+
+# ias_client is kept as a separate client, similar to the PoET 1.0 code
+
+[dependencies]
+hyper = "0.12.11"
+hyper-tls = "0.3.0"
+native-tls = "0.2.1"
+serde_json = "1.0"
+tokio-core = "0.1.17"
+futures = "0.1.24"
+serde_derive = "1.0.79"
+serde = "1.0"
+
+[lib]
+# The name of a target is the name of the library that will be generated.
+name = "ias_client"
+
+# This field points at where the crate is located, relative to the `Cargo.toml`.
+path = "src/ias_client.rs"
+
+# A flag for enabling unit tests for this target. This is used by `cargo test`.
+test = true

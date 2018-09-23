@@ -27,3 +27,7 @@
 /src/validator-registry-tp/bin/
 
 *.batch
+
+src/ias_client/target/**
+src/ias_proxy/target/**
+*.lock

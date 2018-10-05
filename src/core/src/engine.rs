@@ -83,7 +83,7 @@ impl Engine for Poet2Engine {
                         Update::BlockNew(block) => {
                             info!("Checking consensus data: {:?}", block);
 
-                            if check_consensus(block.clone(), &mut service) {
+                            if check_consensus(block.clone(), &mut service,&validator_id) {
                                 info!("Passed consensus check: {:?}", block);
                                 service.check_block(block.clone().block_id);
                                 // Retain the block in static scope here for
@@ -398,14 +398,15 @@ pub fn to_hex_string(bytes: Vec<u8>) -> String {
 *
 */
 
-fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
+fn check_consensus(block: Block, service: &mut Poet2Service, validator_id: &Vec<u8> ) -> bool {
     // 1. Validator registry check
     // 4. Match Local Mean against the locally computed
     // 5. Verfidy BlockDigest is a valid ECDSA of
     //    SHA256 hash of block using OPK
 
     //\\ 2. Signature validation using sender's PPK
-    if !verify_wait_certificate(block){
+    if !verify_wait_certificate(block.clone())
+    {
         return false;
     }
 
@@ -420,9 +421,12 @@ fn check_consensus(block: Block, service: &mut Poet2Service) -> bool {
     }*/
 
     // 7. c-test
-    /*if validator_is_claiming_too_early( service ) {
+    let block_signer = to_hex_string(Vec::from(block.signer_id.clone()));
+    let validator = to_hex_string(validator_id.to_vec());
+    
+    if validator == block_signer && validator_is_claiming_too_early( block, service){
         return false;
-    }*/
+    }
 
     //\\ 8. Compare CC & WC
     let chain_clock = service.get_chain_clock();
@@ -455,8 +459,8 @@ fn validtor_has_claimed_block_limit( service: &mut Poet2Service ) -> bool {
         block_claim_limit = key_block_claim_limit.parse::<i32>().unwrap();
     }
 
-    // let mut validator_state = self.get_validator_state(); //                         //stubbed
-    //if validator_state.poet_public_key == validator_info.signup_info.poet_public_key //stubbed
+    // let mut validator_state = self.get_validator_state();//                          //stubbed
+    // if validator_state.poet_public_key == validator_info.signup_info.poet_public_key //stubbed
 
     if poet_public_key == validator_info_signup_info_poet_public_key     //stubbed function replaced with dummy function
     {
@@ -470,19 +474,20 @@ fn validtor_has_claimed_block_limit( service: &mut Poet2Service ) -> bool {
 
 
 //c-test
-//      fn validator_is_claiming_too_early(&mut self , block_id : BlockId ,block_number : i32 ,validator_registry_view:ValidatorRegistryView , block_store:Blockstore)
-fn validator_is_claiming_too_early( service: &mut Poet2Service )->bool
+fn validator_is_claiming_too_early( block: Block, service: &mut Poet2Service )->bool
 {
 
-    let number_of_validators = 32;
-    let total_block_claim_count = 33 ;
-    let commit_block_block_num = 2;
-    let block_number = 5 ;
-//  number_of_validators = (validator_registry_view.get_validators()).len();  //stubbed function
+    let number_of_validators = 3_u64;
+    //    number_of_validators = (validator_registry_view.get_validators()).len();  //stubbed function
+    let total_block_claim_count = block.block_num - 1;
+    let commit_block_block_num = 0_u64;
+    //    let commit_block = block_store.get_block_by_transaction_id(validator_info.transaction_id)
+    let block_number = block.block_num;
+
     let block_claim_delay_from_settings = service.get_setting_from_head(
         String::from("sawtooth.poet.block_claim_delay"));
 
-    let key_block_claim_delay = block_claim_delay_from_settings.parse::<i32>().unwrap();
+    let key_block_claim_delay = block_claim_delay_from_settings.parse::<u64>().unwrap();
     let block_claim_delay = cmp::min(key_block_claim_delay, number_of_validators - 1);
 
     if total_block_claim_count <= block_claim_delay
@@ -491,15 +496,15 @@ fn validator_is_claiming_too_early( service: &mut Poet2Service )->bool
     }
     // need to use get_block from service expecting block_id to have been stored
     // along with validator info in the Poet 2 module
+	
+    let blocks_claimed_since_registration  = block_number - commit_block_block_num - 1 ;
 
-//  let commit_block = block_store.get_block_by_transaction_id(validator_info.transaction_id)  //
-
-    let blocks_claimed_since_registration = block_number - commit_block_block_num - 1 ;
-
-    if block_claim_delay > blocks_claimed_since_registration
+    if block_claim_delay > blocks_claimed_since_registration 
     {
+        debug!("Failed c-test");
         return true;
     }
+    debug!("Passed c-test");
     return false;
 
 }

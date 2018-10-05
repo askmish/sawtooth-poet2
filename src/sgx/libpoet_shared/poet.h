@@ -219,6 +219,8 @@ extern "C" {
     	size_t validatorIdLen,
     	const char* prevBlockId,
     	size_t prevBlockIdLen,
+        const char* poetBlockId,
+        size_t poetBlockIdLen,
     	uint8_t *duration,
         size_t durationLen
     	);
@@ -233,6 +235,7 @@ extern "C" {
     	size_t prevBlockIdLen,
     	const char* blockSummary,
     	size_t blockSummaryLen,
+        uint64_t waitTime,
     	char* serializedWaitCertificate,
     	size_t serializedWaitCertificateLen,
     	char* serializedWaitCertificateSignature,

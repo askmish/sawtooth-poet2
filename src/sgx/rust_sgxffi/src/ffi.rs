@@ -26,31 +26,37 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem::transmute;
 
-pub fn init_enclave(eid: &mut r_sgx_enclave_id_t, signed_enclave: &str, 
-                    spid: &str) -> i32 {
+pub fn init_enclave(eid: &mut r_sgx_enclave_id_t, signed_enclave: &str,
+                    spid: &str) -> Result<String,String> {
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;
-        let enclave_cstring = CString::new(signed_enclave).unwrap();        
-        let spid_cstring = CString::new(spid).unwrap();       
+        let enclave_cstring = CString::new(signed_enclave).unwrap();
+        let spid_cstring = CString::new(spid).unwrap();
         let enclave_init_status = r_initialize_enclave(eid_ptr,
                                                     enclave_cstring.as_ptr(),
                                                     spid_cstring.as_ptr());
 
-        enclave_init_status
-    }        
+        match enclave_init_status {
+            0 => Ok("Success".to_string()),
+            _ => Err("Enclave initialization failed".to_string()),
+        }
+    }
 }
 
-pub fn free_enclave(eid: &mut r_sgx_enclave_id_t) -> i32 {
+pub fn free_enclave(eid: &mut r_sgx_enclave_id_t) -> Result<String,String> {
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;                
         let enclave_free_status = r_free_enclave(eid_ptr);
 
-        enclave_free_status
+        match enclave_free_status {
+            0 => Ok("Success".to_string()),
+            _ => Err("Enclave free failed".to_string()),
+        }
     }    
 }
 
 pub fn create_signup_info(eid: &mut r_sgx_enclave_id_t, opk_hash: &str, 
-                            signup_info: &mut r_sgx_signup_info_t) -> i32 {
+                    signup_info: &mut r_sgx_signup_info_t) -> Result<String,String> {
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;
         let signup_info_ptr = signup_info as *mut r_sgx_signup_info_t;
@@ -59,13 +65,16 @@ pub fn create_signup_info(eid: &mut r_sgx_enclave_id_t, opk_hash: &str,
                                             opk_hash_cstring.as_ptr(), 
                                             signup_info_ptr);
 
-        signup_status
+        match signup_status {
+            0 => Ok("Success".to_string()),
+            _ => Err("Create Signup info failed".to_string()),
+        }
     } 
 }
 
 pub fn initialize_wait_cert(eid: &mut r_sgx_enclave_id_t, duration: &mut u64, 
-                            prev_cert: &str, prev_block_id: &str, 
-                            validator_id: &str) -> i32 {    
+                            prev_cert: &str, prev_block_id: &str, poet_block_id: &str,
+                            validator_id: &str) -> Result<String,String> {    
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;
         
@@ -74,35 +83,48 @@ pub fn initialize_wait_cert(eid: &mut r_sgx_enclave_id_t, duration: &mut u64,
         let duration_ptr = duration_arr.as_mut_ptr();
         let prev_cert_cstring = CString::new(prev_cert).unwrap();
         let prev_block_id_cstring = CString::new(prev_block_id).unwrap();
+        let poet_block_id_cstring = CString::new(poet_block_id).unwrap();
         let validator_id_ctring = CString::new(validator_id).unwrap();
         let wait_cert_init_status = r_initialize_wait_certificate(eid_ptr, 
                                         duration_ptr, 
                                         prev_cert_cstring.as_ptr(), 
-                                        prev_block_id_cstring.as_ptr(), 
+                                        prev_block_id_cstring.as_ptr(),
+                                        poet_block_id_cstring.as_ptr(),
                                         validator_id_ctring.as_ptr());  
 
         //convert u8 array to u64 duration
         *duration = transmute::<[u8; 8], u64>(duration_arr).to_le();
 
-        wait_cert_init_status
+        match wait_cert_init_status {
+            0 => Ok("Success".to_string()),
+            _ => Err("Initialize certificate failed".to_string()),
+        }
     }
      
 }
 
 pub fn finalize_wait_cert(eid: &mut r_sgx_enclave_id_t, 
                           wait_cert_info: &mut r_sgx_wait_certificate_t, 
-                          prev_block_id: &str, block_summary: &str) -> i32 {
+                          prev_block_id: &str, block_summary: &str, 
+                          wait_time: &u64) -> Result<String,String> {
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;
         let wait_cert_ptr = wait_cert_info  as *mut r_sgx_wait_certificate_t;
         let prev_block_id_cstring = CString::new(prev_block_id).unwrap();
         let block_summary_cstring = CString::new(block_summary).unwrap();
+
+        println!("invoking r_finalize_wait_certificate");
+        println!("wait_time inside ffi:: {:?}", *wait_time);
         let wait_cert_final_status = r_finalize_wait_certificate(eid_ptr, 
                                                 wait_cert_ptr, 
                                                 prev_block_id_cstring.as_ptr(), 
-                                                block_summary_cstring.as_ptr());
+                                                block_summary_cstring.as_ptr(),
+                                                *wait_time);
 
-        wait_cert_final_status
+        match wait_cert_final_status {
+            0 => Ok("Success".to_string()),
+            _ => Err("Finalize certificate failed".to_string()),
+        }
     }
 }
 
@@ -115,26 +137,32 @@ pub fn create_string_from_char_ptr(cchar_ptr : *mut ::std::os::raw::c_char) -> S
 }
 
 pub fn release_signup_info(eid: &mut r_sgx_enclave_id_t, 
-                    signup_info: &mut r_sgx_signup_info_t) -> i32 {
+                    signup_info: &mut r_sgx_signup_info_t) -> Result<String,String> {
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;
         let signup_info_ptr = signup_info as *mut r_sgx_signup_info_t;                
         let singup_release_status = r_release_signup_info(eid_ptr, 
                                                     signup_info_ptr);
 
-        singup_release_status
+        match singup_release_status {
+            0 => Ok("Success".to_string()),
+            _ => Err("Release signup info failed".to_string()),
+        }
     } 
 
 }
 
 pub fn release_wait_certificate(eid: &mut r_sgx_enclave_id_t, 
-                        wait_cert: &mut r_sgx_wait_certificate_t) -> i32 {
+                        wait_cert: &mut r_sgx_wait_certificate_t) -> Result<String,String> {
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;
         let wait_cert_ptr = wait_cert as * mut r_sgx_wait_certificate_t;
         let wait_cert_release_status = r_release_wait_certificate(eid_ptr, 
                                                     wait_cert_ptr);
 
-        wait_cert_release_status
+        match wait_cert_release_status {
+            0 => Ok("Success".to_string()),
+            _ => Err("Release wait certificate failed".to_string()),
+        }
     }
 }

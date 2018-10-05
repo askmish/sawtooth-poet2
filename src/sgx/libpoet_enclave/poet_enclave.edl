@@ -52,6 +52,8 @@ enclave {
             size_t inValidatorIdLen,
             [in, string] const char* inPrevBlockId,
             size_t inPrevBlockIdLen,
+            [in, string] const char* inPoetBlockId,
+            size_t inPoetBlockIdLen,
             [out, size=inDurationLenBytes] uint8_t* outDuration,
             size_t inDurationLenBytes
             );
@@ -61,6 +63,7 @@ enclave {
             size_t inPrevBlockIdLen,
             [in, string] const char* inBlockSummary,
             size_t inBlockSummaryLen,
+            uint64_t inWaitTime,
             [out, size=inSerializedWaitCertificateLen] char* outSerializedWaitCertificate,
             size_t inSerializedWaitCertificateLen,
             [out] sgx_ec256_signature_t* outWaitCertificateSignature

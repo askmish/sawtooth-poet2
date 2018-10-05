@@ -20,8 +20,12 @@ use std::thread::sleep;
 use std::time;
 use std::time::Instant;
 use poet2_util;
-use enclave_sim as enclave;
 use std::collections::HashMap;
+use enclave_sgx as enclave;
+use enclave_sgx::*;
+use sgxffi::ffi::r_sgx_enclave_id_t;
+use sgxffi::ffi::r_sgx_signup_info_t;       
+use sgxffi::ffi::r_sgx_wait_certificate_t;
 
 const DEFAULT_WAIT_TIME: u64 = 0;
 
@@ -29,6 +33,7 @@ pub struct Poet2Service {
     service: Box<Service>,
     init_wall_clock: Instant,
     chain_clock: u64,
+    pub enclave: EnclaveConfig,
 }
 
 impl Poet2Service {
@@ -38,6 +43,7 @@ impl Poet2Service {
             service : service_,
             init_wall_clock : now,
             chain_clock : 0,
+            enclave : EnclaveConfig::default(),
         }
     }
 
@@ -133,12 +139,13 @@ impl Poet2Service {
             .expect("Failed to commit block");
     }
 
+
     pub fn cancel_block(&mut self) {
         debug!("Cancelling block");
         //TODO Handle InvalidState better
         match self.service.cancel_block() {
-            Ok(_) => {enclave::cancel_wait_certificate();}
-            Err(Error::InvalidState(_)) => {enclave::cancel_wait_certificate();}
+            Ok(_) => {}
+            Err(Error::InvalidState(_)) => {}
             Err(err) => {
                 panic!("Failed to cancel block: {:?}", err);
             }
@@ -184,10 +191,10 @@ impl Poet2Service {
             prev_wait_certificate_sig = result.1;
         }
 
-        duration64 = enclave::initialize_wait_certificate(
+        duration64 = EnclaveConfig::initialize_wait_certificate(
+                              self.enclave.enclave_id,
                               prev_wait_certificate,
-                              poet2_util::blockid_to_hex_string(
-                                          chain_head.block_id),
+                              poet2_util::blockid_to_hex_string(chain_head.previous_id),
                               prev_wait_certificate_sig,
                               &validator_id);
 
@@ -240,8 +247,11 @@ impl Poet2Service {
                 poet2_util::payload_to_wc_and_sig(chain_head.payload.clone()).1;
         }
          info!("Block id returned is {:?}", Vec::from(chain_head.block_id.clone()));
-         let (serial_cert, cert_signature) = enclave::finalize_wait_certificate(
-                 prev_wait_certificate_sig,
+         let (serial_cert, cert_signature) = EnclaveConfig::finalize_wait_certificate(
+                 self.enclave.enclave_id,
+                 self.enclave.signup_info,
+                 poet2_util::blockid_to_hex_string(chain_head.previous_id),
+                 prev_wait_certificate_sig, 
                  poet2_util::to_hex_string(summary),
                  wait_time
              );

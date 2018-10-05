@@ -26,11 +26,13 @@ typedef struct {
 /* Holder for binary representation of WaitCertificate */
 typedef struct
 {
-    uint8_t duration[DURATION_LENGTH_BYTES];
-    uint64_t block_num;
+    std::string duration;
+    std::string poet_block_id;
     std::string previous_block_id;
-    std::string validator_id;
     std::string block_summary;
+    uint64_t block_num;
+    std::string validator_id;
+    uint64_t wait_time;
 } WaitCertificate;
 
 typedef struct {

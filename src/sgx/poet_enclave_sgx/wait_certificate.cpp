@@ -71,11 +71,10 @@ bool _verify_wait_certificate(
 
 WaitCertificate::WaitCertificate(
     const std::string& prevBlockId,
-    const std::string& blockSummary
+    const std::string& blockSummary,
+    uint64_t waitTime
     )
 {
-    //PyLog(POET_LOG_INFO, "Create SGX Wait Certificate");
- 
     StringBuffer serializedBuffer(Poet_GetWaitCertificateSize());
     StringBuffer signatureBuffer(Poet_GetSignatureSize());
 
@@ -85,6 +84,7 @@ WaitCertificate::WaitCertificate(
             prevBlockId.length(),
             blockSummary.c_str(),
             blockSummary.length(),
+            waitTime,
             serializedBuffer.data(),
             serializedBuffer.length,
             signatureBuffer.data(),
@@ -102,6 +102,7 @@ poet_err_t WaitCertificate::_InitializeWaitCertificate(
     const std::string& prevWaitCertificate,
     const std::string& validatorId,
     const std::string& prevBlockId,
+    const std::string& poetBlockId,
     uint8_t *duration,
     size_t durationLen
     )
@@ -114,6 +115,8 @@ poet_err_t WaitCertificate::_InitializeWaitCertificate(
             validatorId.length(),
             prevBlockId.c_str(),
             prevBlockId.length(),
+            poetBlockId.c_str(),
+            poetBlockId.length(),
             duration,
             durationLen
             );
@@ -124,10 +127,11 @@ poet_err_t WaitCertificate::_InitializeWaitCertificate(
 
 WaitCertificate* WaitCertificate::_FinalizeWaitCertificate(
     const std::string& prevBlockId,
-    const std::string& blockSummary
+    const std::string& blockSummary,
+    uint64_t waitTime
     )
 { 
-    return new WaitCertificate(prevBlockId, blockSummary);
+    return new WaitCertificate(prevBlockId, blockSummary, waitTime);
 } // WaitCertificate::_FinalizeWaitCertificate
 
 
@@ -135,19 +139,21 @@ poet_err_t initialize_wait_certificate(
     const std::string& prevWaitCertificate,
     const std::string& prevBlockId,
     const std::string& validatorId,
+    const std::string& poetBlockId,
     uint8_t *duration,
     size_t durationLen
     )
 { 
-    return WaitCertificate::_InitializeWaitCertificate( prevWaitCertificate, validatorId, prevBlockId, duration, durationLen);
+    return WaitCertificate::_InitializeWaitCertificate( prevWaitCertificate, validatorId, prevBlockId, poetBlockId, duration, durationLen);
 }
 
 WaitCertificate* finalize_wait_certificate(
     const std::string& prevBlockId,
-    const std::string& blockSummary
+    const std::string& blockSummary,
+    uint64_t waitTime
     )
 {
-    return WaitCertificate::_FinalizeWaitCertificate( prevBlockId, blockSummary);
+    return WaitCertificate::_FinalizeWaitCertificate( prevBlockId, blockSummary, waitTime);
 }
 
 void _destroy_wait_certificate(WaitCertificate *waitCert)
@@ -183,7 +189,7 @@ void WaitCertificate::deserialize(
             ValueError(
                 "Failed to extract BlockHash from serialized wait certificate");
     }
-    if (json_object_object_get_ex(jsonObject, "block_num", &jsonValue)) {  
+    if (json_object_object_get_ex(jsonObject, "block_number", &jsonValue)) {  
         this->block_num = json_object_get_int(jsonValue);     
     } else {
         throw
@@ -191,20 +197,25 @@ void WaitCertificate::deserialize(
                 "Failed to extract BlockHash from serialized wait certificate");
     }
 
-    json_object *jArrElement;
-    if (json_object_object_get_ex(jsonObject, "duration", &jsonValue)) {        
-        int json_arr_len = json_object_array_length(jsonValue);
-        for(int i=0; i<json_arr_len; i++) {
-            jArrElement = json_object_array_get_idx(jsonValue, i);
-            this->duration[i] = json_object_get_int(jArrElement);
-        }
+    if (json_object_object_get_ex(jsonObject, "duration_id", &jsonValue)) {
+        this->duration = json_object_get_string(jsonValue);
     } else {
         throw
             ValueError(
-                "Failed to extract Duration from serialized wait certificate");
+                "Failed to extract Duration from serialized wait "
+                "certificate");
     }
 
-    if (json_object_object_get_ex(jsonObject, "previous_block_id", &jsonValue)) {
+    if (json_object_object_get_ex(jsonObject, "poet_block_id", &jsonValue)) {
+        this->poet_block_id = json_object_get_string(jsonValue);
+    } else {
+        throw
+            ValueError(
+                "Failed to extract PoetBlockId from serialized wait "
+                "certificate");
+    }
+
+    if (json_object_object_get_ex(jsonObject, "prev_block_id", &jsonValue)) {
         this->previous_block_id = json_object_get_string(jsonValue);
     } else {
         throw

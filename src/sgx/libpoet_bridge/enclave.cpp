@@ -484,6 +484,8 @@ namespace sawtooth {
             size_t inValidatorIdLen,
             const char* inPrevBlockId,
             size_t inPrevBlockIdLen,
+            const char* inPoetBlockId,
+            size_t inPoetBlockIdLen,
             uint8_t* duration,
             size_t inDurationLen
             )   
@@ -491,6 +493,7 @@ namespace sawtooth {
     
             ThrowIfNull( inPreviousWaitCertificate, "NULL PreviousWaitCertificate");
             ThrowIfNull( inValidatorId, "NULL ValidatorId");
+            ThrowIfNull( inPoetBlockId, "NULL PoetBlockId");
             ThrowIfNull( inPrevBlockId, "Wait certificate signature pointer is NULL");
 
             poet_err_t poetRet = POET_SUCCESS;
@@ -504,6 +507,8 @@ namespace sawtooth {
                          inValidatorIdLen, 
                          inPrevBlockId, 
                          inPrevBlockIdLen,
+                         inPoetBlockId,
+                         inPoetBlockIdLen,
                          duration,
                          inDurationLen] () {
                         sgx_status_t ret = 
@@ -516,6 +521,8 @@ namespace sawtooth {
                                 inValidatorIdLen,
                                 inPrevBlockId,
                                 inPrevBlockIdLen,
+                                inPoetBlockId,
+                                inPoetBlockIdLen,
                                 duration,
                                 inDurationLen);
                         return ConvertPoetErrorStatus(ret, poetRet);
@@ -528,7 +535,8 @@ namespace sawtooth {
             const char* inPrevBlockId,
             size_t inPrevBlockIdLen,
             const char* inBlockSummary,
-            size_t inBlockSummaryLen, 
+            size_t inBlockSummaryLen,
+            uint64_t inWaitTime,
             char* outSerializedWaitCertificate, 
             size_t outSerializedWaitCertificateLen, 
             sgx_ec256_signature_t* outWaitCertificateSignature
@@ -536,6 +544,7 @@ namespace sawtooth {
         {
             ThrowIfNull(inPrevBlockId, "NULL PoetBlockId");
             ThrowIfNull(inBlockSummary, "NULL BlockSummary");
+            ThrowIfNull(inWaitTime, "NULL WaitTime");
 
             poet_err_t poetRet = POET_SUCCESS;
             sgx_status_t ret =
@@ -546,6 +555,7 @@ namespace sawtooth {
                          inPrevBlockIdLen,
                          inBlockSummary,
                          inBlockSummaryLen,
+                         inWaitTime,
                          outSerializedWaitCertificate,
                          outSerializedWaitCertificateLen,
                          outWaitCertificateSignature] () {
@@ -557,6 +567,7 @@ namespace sawtooth {
                                 inPrevBlockIdLen,
                                 inBlockSummary,
                                 inBlockSummaryLen,
+                                inWaitTime,
                                 outSerializedWaitCertificate,
                                 outSerializedWaitCertificateLen,
                                 outWaitCertificateSignature);

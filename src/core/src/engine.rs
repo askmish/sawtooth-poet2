@@ -28,8 +28,8 @@ use std::cmp;
 use serde_json;
 use std::time::Duration;
 use std::time::Instant;
-use enclave_sim::*;
 use std::collections::HashMap;
+use enclave_sgx::*;
 use consensus_state::*;
 use consensus_state_store::ConsensusStateStore;
 use poet2_util;
@@ -67,12 +67,15 @@ impl Engine for Poet2Engine {
         let mut block_num:u64 = 0;
         let mut ctx = create_context().unwrap();
         let mut state_store = open_statestore(&ctx).unwrap();
+
+        service.enclave.initialize_enclave();
+
+        service.enclave.create_signup_info(&validator_id);
+
         let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id));
         let mut prev_wait_time = 0;
         let mut poet2_settings_view = Poet2SettingsView::new();
         poet2_settings_view.init(chain_head.block_id.clone(), &mut service);
-
-        create_signup_info();
 
         service.initialize_block(None);
 

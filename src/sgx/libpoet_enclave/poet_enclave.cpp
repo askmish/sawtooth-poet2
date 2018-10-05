@@ -337,6 +337,8 @@ poet_err_t ecall_InitializeWaitCertificate(
     size_t inValidatorIdLen,
     const char* inPrevBlockId,
     size_t inPrevBlockIdLen,
+    const char* inPoetBlockId,
+    size_t inPoetBlockIdLen,
     uint8_t* outDuration,
     size_t inDurationLenBytes
     ) 
@@ -355,6 +357,10 @@ poet_err_t ecall_InitializeWaitCertificate(
         sp::ThrowIfNull(
             inPrevBlockId,
             "Previous block ID is NULL. It can be empty but not NULL");
+
+        sp::ThrowIfNull(
+            inPoetBlockId,
+            "Poet block ID is NULL");
 
         sp::ThrowIfNull(
             outDuration,
@@ -388,7 +394,7 @@ poet_err_t ecall_InitializeWaitCertificate(
 
         gWaitCertData.waitCert.validator_id = inValidatorId;
         gWaitCertData.waitCert.previous_block_id = inPrevBlockId;
-        memcpy(gWaitCertData.waitCert.duration, duration, DURATION_LENGTH_BYTES);
+        gWaitCertData.waitCert.poet_block_id = inPoetBlockId;
 
         //block summary will be filled in finalize wait certificate
         gWaitCertData.waitCert.block_summary.clear();
@@ -398,6 +404,15 @@ poet_err_t ecall_InitializeWaitCertificate(
             outDuration[i] = duration[i];
         }
 
+        //reverse duration array
+        for(int i = 0; i < DURATION_LENGTH_BYTES/2; i++){
+            uint8_t temp = duration[i];
+            duration[i] = duration[(DURATION_LENGTH_BYTES - 1) - i];
+            duration[(DURATION_LENGTH_BYTES - 1) - i] = temp;
+        }
+
+        gWaitCertData.waitCert.duration.clear();
+        gWaitCertData.waitCert.duration = sp::BinaryToHexString(duration,DURATION_LENGTH_BYTES);
         //Wait certificate is initialized
         gWaitCertData.initialized = true;
         
@@ -417,6 +432,7 @@ poet_err_t ecall_FinalizeWaitCertificate(
     size_t inPrevBlockIdLen, 
     const char* inBlockSummary, 
     size_t inBlockSummaryLen,
+    uint64_t inWaitTime,
     char* outSerializedWaitCertificate, 
     size_t outSerializedWaitCertificateLen, 
     sgx_ec256_signature_t* outWaitCertificateSignature)
@@ -424,7 +440,6 @@ poet_err_t ecall_FinalizeWaitCertificate(
     poet_err_t result = POET_SUCCESS;
 
     try{    
-
         sp::ThrowIfNull(
             inPrevBlockId,
             "Previous BlockId is NULL");
@@ -435,6 +450,10 @@ poet_err_t ecall_FinalizeWaitCertificate(
 
         sp::ThrowIf<sp::ValueError>(!inBlockSummaryLen, 
                    "Block summary length must be non-zero");
+
+        sp::ThrowIfNull(
+            inWaitTime,
+            "Wait time is NULL");
 
         sp::ThrowIfNull(
             outSerializedWaitCertificate,
@@ -457,7 +476,7 @@ poet_err_t ecall_FinalizeWaitCertificate(
         }
 
         gWaitCertData.waitCert.block_summary = (char*)inBlockSummary;
-
+        gWaitCertData.waitCert.wait_time = inWaitTime;
         // serialize final wait certificate
         JsonValue waitCertValue(json_value_init_object());
         sp::ThrowIf<sp::RuntimeError>(
@@ -471,20 +490,16 @@ poet_err_t ecall_FinalizeWaitCertificate(
             "WaitCertification serialization failed on retrieval of JSON "
             "object.");
 
-        // Use alphabetical order for the keys to ensure predictable serialization
-        JSON_Array *duration = NULL;
-        JSON_Status jret = json_object_dotset_number(waitCertObject, "block_num", gWaitCertData.waitCert.block_num);
+        JSON_Status jret = json_object_dotset_number(waitCertObject, "block_number", gWaitCertData.waitCert.block_num);
         sp::ThrowIf<sp::RuntimeError>(jret != JSONSuccess, "WaitCertificate serialization failed on BlockNum.");
 
-        jret = json_object_dotset_value(waitCertObject, "duration", json_value_init_array());
-        sp::ThrowIf<sp::RuntimeError>(jret != JSONSuccess, "Unable to initialize JSON array");
+        jret = json_object_dotset_string(waitCertObject, "duration_id", gWaitCertData.waitCert.duration.c_str());
+        sp::ThrowIf<sp::RuntimeError>( jret != JSONSuccess, "WaitCertificate serialization failed on Duration.");
 
-        duration = json_object_get_array(waitCertObject, "duration");
+        jret = json_object_dotset_string(waitCertObject, "poet_block_id", gWaitCertData.waitCert.poet_block_id.c_str());
+        sp::ThrowIf<sp::RuntimeError>( jret != JSONSuccess, "WaitCertificate serialization failed on PoetBlockId.");
 
-        for(int i=0; i<DURATION_LENGTH_BYTES; i++)
-            json_array_append_number( duration, gWaitCertData.waitCert.duration[i] ) ;
-
-        jret = json_object_dotset_string(waitCertObject, "previous_block_id", gWaitCertData.waitCert.previous_block_id.c_str());
+        jret = json_object_dotset_string(waitCertObject, "prev_block_id", gWaitCertData.waitCert.previous_block_id.c_str());
         sp::ThrowIf<sp::RuntimeError>( jret != JSONSuccess, "WaitCertificate serialization failed on PreviousBlockId.");
 
         jret = json_object_dotset_string(waitCertObject, "block_summary", gWaitCertData.waitCert.block_summary.c_str());
@@ -492,6 +507,9 @@ poet_err_t ecall_FinalizeWaitCertificate(
 
         jret = json_object_dotset_string(waitCertObject, "validator_id", gWaitCertData.waitCert.validator_id.c_str());
         sp::ThrowIf<sp::RuntimeError>( jret != JSONSuccess, "WaitCertificate serialization failed on ValidatorId.");
+
+        jret = json_object_dotset_number(waitCertObject, "wait_time", gWaitCertData.waitCert.wait_time);
+        sp::ThrowIf<sp::RuntimeError>(jret != JSONSuccess, "WaitCertificate serialization failed on WaitTime.");
 
         //serialize waitCert object
         size_t serializedSize = json_serialization_size(waitCertValue);
@@ -700,6 +718,7 @@ void clearWaitCertificate(WaitCertificate *waitCert) {
     waitCert->previous_block_id.clear();
     waitCert->validator_id.clear();
     waitCert->block_summary.clear();
-    Zero(waitCert->duration,sizeof(waitCert->duration));
-
+    //Zero(waitCert->duration,sizeof(waitCert->duration));
+    waitCert->duration.clear();
+    waitCert->wait_time = 0;
 } //clearWaitCertificate

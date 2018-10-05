@@ -100,12 +100,14 @@ class WaitCertificate
         const std::string& prevWaitCertificate,
         const std::string& validatorId,
         const std::string& prevBlockId,
+        const std::string& poetBlockId,
         uint8_t *duration,
         size_t durationLen
         );
     static WaitCertificate* _FinalizeWaitCertificate(
-        const std::string& poetBlockId,
-        const std::string& blockSummary
+        const std::string& prevBlockId,
+        const std::string& blockSummary,
+        uint64_t waitTime
         );
     static WaitCertificate* _WaitCertificateFromSerialized(
         const std::string& serializedCertificate,
@@ -119,12 +121,13 @@ class WaitCertificate
         );
 
     // WaitCertificate Parameters
-    uint8_t duration[32];
+    std::string duration;
     std::string previous_block_id;
+    std::string poet_block_id;
     std::string validator_id;
     std::string block_summary;
     uint64_t block_num;
-
+    uint64_t waitTime;
     /*
     Json serialization of the WaitCertificate Parameters, this serves as the
     canonical representation of the WaitCertificate. The signature field is
@@ -144,7 +147,8 @@ class WaitCertificate
 protected:
     WaitCertificate(
         const std::string& poetBlockId,
-        const std::string& blockSummary
+        const std::string& blockSummary,
+        uint64_t waitTime
         );
     WaitCertificate();
     /*WaitCertificate(
@@ -163,13 +167,15 @@ poet_err_t initialize_wait_certificate(
     const std::string& prevWaitCertificate,
     const std::string& validatorId,
     const std::string& prevBlockId,
+    const std::string& poetBlockId,
     uint8_t *duration,
     size_t durationLen
     );
 
 WaitCertificate* finalize_wait_certificate(
-    const std::string& poetBlockId,
-    const std::string& blockSummary
+    const std::string& prevBlockId,
+    const std::string& blockSummary,
+    uint64_t waitTime
     );
 
 bool _verify_wait_certificate(

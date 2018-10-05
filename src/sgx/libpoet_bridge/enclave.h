@@ -87,6 +87,8 @@ namespace sawtooth {
                 size_t inValidatorIdLen,
                 const char* inPrevBlockId,
                 size_t inPrevBlockIdLen,
+                const char* inPoetBlockId,
+                size_t inPoetBlockIdLen,
                 uint8_t* duration,
                 size_t inDurationLen
                 );
@@ -94,7 +96,8 @@ namespace sawtooth {
                 const char* inPrevBlockId,
                 size_t inPrevBlockIdLen,
                 const char* inBlockSummary,
-                size_t inBlockSummaryLen, 
+                size_t inBlockSummaryLen,
+                uint64_t inWaitTime,
                 char* outSerializedWaitCertificate, 
                 size_t outSerializedWaitCertificateLen, 
                 sgx_ec256_signature_t* outWaitCertificateSignature

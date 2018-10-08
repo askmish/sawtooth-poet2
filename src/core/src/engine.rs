@@ -29,10 +29,13 @@ use serde_json;
 use std::time::Duration;
 use std::time::Instant;
 use enclave_sim::*;
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use consensus_state::*;
-use consensus_state_store::{ConsensusStateStore, InMemoryConsensusStateStore};
+use consensus_state_store::ConsensusStateStore;
 use poet2_util;
+use database::config;
+use database::lmdb;
+use database::{DatabaseError, CliError};
 
 const DEFAULT_BLOCK_CLAIM_LIMIT:i32 = 250;
 
@@ -61,7 +64,8 @@ impl Engine for Poet2Engine {
         let validator_id = Vec::from(startup_state.local_peer_info.peer_id);
         let mut block_num_id_map:HashMap<u64, BlockId> = HashMap::new();
         let mut block_num:u64 = 0;
-        let mut state_store = InMemoryConsensusStateStore::new();
+        let mut ctx = create_context().unwrap();
+        let mut state_store = open_statestore(&ctx).unwrap();
         let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id));
         let mut prev_wait_time = 0;
 
@@ -137,7 +141,7 @@ impl Engine for Poet2Engine {
                                         state.aggregate_chain_clock = agg_chain_clock;
                                         state.estimate_info = EstimateInfo{
                                             population_estimate : 0_f64,
-                                            previous_block_id   : block.previous_id.clone(),
+                                            previous_block_id   : to_hex_string(Vec::from(block.previous_id.clone())),
                                             validator_id        : to_hex_string(Vec::from(
                                                                       block.signer_id.clone())),
                                         };
@@ -172,7 +176,7 @@ impl Engine for Poet2Engine {
                                         loop {
                                             let mut cache_block_ = service.get_block(cache_block.previous_id.clone());
 
-                                            // If block's previous not in cache or blockstore,
+                                            // If block's previous not in cache or statestore,
                                             // break from loop and send block to cache
                                             if cache_block_.is_ok() {
 
@@ -250,7 +254,7 @@ impl Engine for Poet2Engine {
                                             debug!("Storing cummulative cc = {}", agg_chain_clock);
                                             state.estimate_info = EstimateInfo{
                                                 population_estimate : 0_f64,
-                                                previous_block_id   : block.previous_id.clone(),
+                                                previous_block_id   : to_hex_string(Vec::from(block.previous_id.clone())),
                                                 validator_id        : to_hex_string(Vec::from(
                                                                           block.signer_id.clone())),
                                             };
@@ -504,6 +508,23 @@ fn validator_is_claiming_too_early( service: &mut Poet2Service )->bool
 
 }
 
+fn create_context() -> Result<lmdb::LmdbContext, CliError> {
+    let path_config = config::get_path_config();
+    let statestore_path = &path_config.data_dir.join(config::get_filename());
+
+    lmdb::LmdbContext::new(statestore_path, 1, None)
+        .map_err(|err| CliError::EnvironmentError(format!("{}", err)))
+}
+
+fn open_statestore(ctx: &lmdb::LmdbContext) -> Result<ConsensusStateStore, CliError> {
+    let statestore_db = lmdb::LmdbDatabase::new(
+        ctx,
+        &["index_consensus_state"],
+    ).map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+
+    Ok(ConsensusStateStore::new(statestore_db))
+}
+
 fn delete_states_upto( ancestor: BlockId, head: BlockId, delete_len: u64,
                        service: &mut Poet2Service, state_store: &mut ConsensusStateStore ) -> ()
 {
@@ -528,7 +549,7 @@ fn delete_states_upto( ancestor: BlockId, head: BlockId, delete_len: u64,
         else {
             debug!("Deleting state for {:?}", next.clone());
             state_store.delete(next.clone());
-            next = state_.unwrap().estimate_info.previous_block_id;
+            next = BlockId::from(state_.unwrap().estimate_info.previous_block_id.as_bytes().to_vec());
         }
     }
 }

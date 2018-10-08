@@ -31,6 +31,7 @@ extern crate rand;
 extern crate sawtooth_sdk;
 extern crate zmq;
 extern crate crypto;
+extern crate bincode;
 
 pub mod engine;
 pub mod service;

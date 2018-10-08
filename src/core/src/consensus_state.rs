@@ -1,10 +1,9 @@
 use sawtooth_sdk::consensus::{engine::*};
 use service::Poet2Service;
 use enclave_sim::WaitCertificate;
-//use consensus_state_store;
 use std::collections::VecDeque;
 use std::collections::HashMap;
-
+#[macro_use]
 use serde_derive;
 use serde_json;
 
@@ -18,7 +17,7 @@ use serde_json;
 *      validator has claimed
 *
 */
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct ValidatorState {
     key_block_claim_count : u64,
     poet_public_key : String,
@@ -33,7 +32,7 @@ pub struct ValidatorState {
 * local_mean (float): The local mean from a wait certificate/timer
 */
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct PopulationSample {
     wait_time: u64,
     local_mean: f64
@@ -52,14 +51,16 @@ pub struct PopulationSample {
 *     block
 *
 */
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct EstimateInfo {
     pub population_estimate : f64,
-    pub previous_block_id: BlockId,
+    // Needs to be of type BlockId but encapsulating structure is required to 
+    // to be serializeable & BlockId is not at the sdk
+    pub previous_block_id: String,//BlockId,
     pub validator_id: String
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct ConsensusState {
     pub population_sample : PopulationSample,
     pub estimate_info : EstimateInfo,
@@ -71,18 +72,20 @@ pub struct ConsensusState {
     pub population_samples: VecDeque< PopulationSample>,
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct ValidatorInfo{
-    id: PeerId, 
+    // Needs to be of type PeerId but encapsulating structure is required to 
+    // to be serializeable & PeerId is not at the sdk
+    id: String,//PeerId,
     poet_public_key: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct PoetSettingsView{
     population_estimate_sample_size: usize,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 struct BlockInfo{
     wait_certificate: Option<WaitCertificate>,
     validator_info: Option<ValidatorInfo>,

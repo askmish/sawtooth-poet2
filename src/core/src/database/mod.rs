@@ -15,8 +15,8 @@
  * ------------------------------------------------------------------------------
  */
 
-//pub mod database;
 pub mod lmdb;
+pub mod config;
 
 use std;
 
@@ -63,6 +63,41 @@ impl std::error::Error for DatabaseError {
             DatabaseError::CorruptionError(_) => None,
             DatabaseError::NotFoundError(_) => None,
             DatabaseError::DuplicateEntry => None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum CliError {
+    ArgumentError(String),
+    EnvironmentError(String),
+    ParseError(String),
+}
+
+impl std::fmt::Display for CliError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            CliError::ArgumentError(ref msg) => write!(f, "ArgumentError: {}", msg),
+            CliError::EnvironmentError(ref msg) => write!(f, "EnvironmentError: {}", msg),
+            CliError::ParseError(ref msg) => write!(f, "ParseError: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for CliError {
+    fn description(&self) -> &str {
+        match *self {
+            CliError::ArgumentError(ref msg) => msg,
+            CliError::EnvironmentError(ref msg) => msg,
+            CliError::ParseError(ref msg) => msg,
+        }
+    }
+
+    fn cause(&self) -> Option<&std::error::Error> {
+        match *self {
+            CliError::ArgumentError(_) => None,
+            CliError::EnvironmentError(_) => None,
+            CliError::ParseError(_) => None,
         }
     }
 }

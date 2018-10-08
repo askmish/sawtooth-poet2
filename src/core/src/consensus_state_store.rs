@@ -15,9 +15,12 @@
  * ------------------------------------------------------------------------------
  */
 
-use std::collections::HashMap;
+use protobuf;
 use consensus_state::ConsensusState;
 use sawtooth_sdk::consensus::engine::BlockId;
+use database::lmdb::{LmdbContext, LmdbDatabase};
+use database::DatabaseError;
+use bincode::{serialize, deserialize};
 
 #[derive(Debug)]
 pub enum ConsensusStateStoreError {
@@ -25,71 +28,45 @@ pub enum ConsensusStateStoreError {
     UnknownConsensusState,
 }
 
-pub trait ConsensusStateStore {
-    fn get<'a>(
-        &'a self,
-        block_id: BlockId,
-    ) -> Result<Box<ConsensusState>, ConsensusStateStoreError>;
-
-    fn delete(&mut self, block_id: BlockId) -> Result<ConsensusState, ConsensusStateStoreError>;
-
-    fn put(&mut self, block_id: BlockId, consensus_state: ConsensusState) -> Result<(), ConsensusStateStoreError>;
+pub struct ConsensusStateStore<'a> {
+    consensus_state_db: LmdbDatabase<'a>,
 }
 
-#[derive(Default)]
-pub struct InMemoryConsensusStateStore {
-    consensus_state_map: HashMap<BlockId, ConsensusState>,
-}
-
-impl InMemoryConsensusStateStore {
-    pub fn new() -> Self {
-        InMemoryConsensusStateStore::default()
+impl<'a> ConsensusStateStore<'a> {
+    pub fn new(db: LmdbDatabase<'a>) -> Self {
+        ConsensusStateStore { consensus_state_db:db, }
     }
-}
+    pub fn get( &self, block_id: BlockId, ) ->
+        Result<Box<ConsensusState>, DatabaseError> {
 
-impl ConsensusStateStore for InMemoryConsensusStateStore {
-    fn get<'a>(
-        &'a self,
-        block_id: BlockId,
-    ) -> Result<Box<ConsensusState>, ConsensusStateStoreError> {
-        let state = self.consensus_state_map.get(&block_id);
-        match state {
-            None => {
-                warn!("No state found for block_id : {:?}", block_id);
-                Err(ConsensusStateStoreError::UnknownConsensusState)
-            },
-            Some(consensus_state) => {
-                debug!("Found state for block_id : {:?}", block_id);
-                Ok(Box::new(consensus_state.clone()))
-            }
-        }
+        let reader = self.consensus_state_db.reader()?;
+        let state = reader.get(&block_id).ok_or_else(|| {
+            DatabaseError::NotFoundError(format!("State not found: {:?}", block_id))
+        })?;
+        debug!("Found state for block_id : {:?}", block_id);
+        let consensus_state:ConsensusState = deserialize(&state).map_err(|err| {
+            DatabaseError::CorruptionError(format!(
+                "Could not interpret stored data as a block: {}",
+                    err
+                )
+            )
+        })?;
+        Ok(Box::new(consensus_state.clone()))
     }
 
-    fn delete(&mut self, block_id: BlockId) -> Result<ConsensusState, ConsensusStateStoreError>{
-        let value = self.consensus_state_map.remove(&block_id);
-        match value {
-            None => {
-                warn!("No state found for block_id : {:?}", block_id);
-                Err(ConsensusStateStoreError::UnknownConsensusState)
-            },
-            Some(consensus_state) => {
-                debug!("Deleted state for block_id : {:?}", block_id);
-                Ok(consensus_state)
-            }
-        }
+    pub fn delete(&mut self, block_id: BlockId) -> Result<(), DatabaseError>{
+        let mut writer = self.consensus_state_db.writer()?;
+        writer.delete(&Vec::from(block_id))?;
 
+        Ok(())
     }
 
-    fn put(&mut self, block_id: BlockId, consensus_state: ConsensusState) -> Result<(), ConsensusStateStoreError>{
-        let value = self.consensus_state_map.insert(block_id.clone(), consensus_state);
-        match value {
-            None => {
-                debug!("New [key,value] inserted for  block_id : {:?}", block_id.clone());
-            },
-            Some(consensus_state) => {
-                debug!("Updated state for block_id : {:?}", block_id);
-            }
-        }
+    pub fn put(&mut self, block_id: BlockId, consensus_state: ConsensusState) -> Result<(), DatabaseError>{
+        let mut writer = self.consensus_state_db.writer()?;
+        let serialized_state = serialize(&consensus_state).map_err(|err| {
+            DatabaseError::WriterError(format!("Failed to serialize state: {}", err))
+        })?;
+        writer.put(&Vec::from(block_id), &serialized_state)?;
         Ok(())
     }
 }

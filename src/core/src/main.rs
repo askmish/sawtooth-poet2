@@ -43,6 +43,7 @@ pub mod consensus_state;
 pub mod consensus_state_store;
 pub mod poet2_util;
 pub mod settings_view;
+pub mod fork_resolver;
 
 use engine::Poet2Engine;
 use sawtooth_sdk::consensus::{zmq_driver::ZmqDriver};

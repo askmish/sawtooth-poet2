@@ -21,6 +21,18 @@ volumes:
   keys:
 
 services:
+  ias-server:
+    image: ias-server:latest
+    build:
+      context: .
+      dockerfile: ias_proxy.dockerfile
+      args:
+        - http_proxy
+        - https_proxy
+        - no_proxy
+    working_dir: /project/ias_proxy/target/debug/
+    command: "ias_proxy -c dummy-config.toml -vvv"
+    stop_signal: SIGKILL
 
   validator-1:
     image: sawtooth-poet2-validator:latest

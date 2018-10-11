@@ -36,6 +36,7 @@ use poet2_util;
 use database::config;
 use database::lmdb;
 use database::{DatabaseError, CliError};
+use settings_view::Poet2SettingsView;
 
 const DEFAULT_BLOCK_CLAIM_LIMIT:i32 = 250;
 
@@ -68,6 +69,8 @@ impl Engine for Poet2Engine {
         let mut state_store = open_statestore(&ctx).unwrap();
         let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id));
         let mut prev_wait_time = 0;
+        let mut poet2_settings_view = Poet2SettingsView::new();
+        poet2_settings_view.init(chain_head.block_id.clone(), &mut service);
 
         create_signup_info();
 

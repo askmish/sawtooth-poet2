@@ -21,6 +21,7 @@ use std::time;
 use std::time::Instant;
 use poet2_util;
 use enclave_sim as enclave;
+use std::collections::HashMap;
 
 const DEFAULT_WAIT_TIME: u64 = 0;
 
@@ -199,6 +200,14 @@ impl Poet2Service {
              wait_time = minimum_duration; 
         }
         return wait_time as u64;
+    }
+
+    pub fn get_settings(&mut self, block_id: BlockId, keys: Vec<String>)
+         -> Result<HashMap<String, String>, Error> {
+        let settings_result = self.service.get_settings(
+            block_id,
+            keys);
+        settings_result
     }
 
     pub fn get_setting(&mut self, block_id: BlockId, key:String) -> String {

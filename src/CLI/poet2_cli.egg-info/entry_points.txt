@@ -1,0 +1,3 @@
+[console_scripts]
+poet2_cli = main:main_wrapper
+

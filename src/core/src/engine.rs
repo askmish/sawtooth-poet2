@@ -70,10 +70,12 @@ impl Engine for Poet2Engine {
         let mut state_store = open_statestore(&ctx).unwrap();
 
         service.enclave.initialize_enclave();
-
         service.enclave.create_signup_info(&validator_id);
 
-        let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id));
+        let signup_data = service.enclave.signup_info;
+        let poet_pub_key = service.enclave.get_poet_pub_key(signup_data);
+
+        let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id, &poet_pub_key));
         let mut prev_wait_time = 0;
         let mut poet2_settings_view = Poet2SettingsView::new();
         poet2_settings_view.init(chain_head.block_id.clone(), &mut service);
@@ -94,7 +96,7 @@ impl Engine for Poet2Engine {
                         Update::BlockNew(block) => {
                             info!("Checking consensus data: {:?}", block);
 
-                            if check_consensus(block.clone(), &mut service,&validator_id) {
+                            if check_consensus(block.clone(), &mut service, &validator_id, &poet_pub_key) {
                                 info!("Passed consensus check: {:?}", block);
                                 service.check_block(block.clone().block_id);
                                 // Retain the block in static scope here for
@@ -129,7 +131,7 @@ impl Engine for Poet2Engine {
                             published_at_height = false;
                             start = Instant::now();
                             let chain_head_block = service.get_chain_head();
-                            wait_time = Duration::from_secs(service.get_wait_time(chain_head_block.clone(), &validator_id));
+                            wait_time = Duration::from_secs(service.get_wait_time(chain_head_block.clone(), &validator_id, &poet_pub_key));
 
                             service.initialize_block(Some(new_chain_head_blockid));
                         },
@@ -192,9 +194,9 @@ impl Engine for Poet2Engine {
                 let new_block_id = service.finalize_block(consensus.as_bytes().to_vec());
                 service.broadcast(new_block_id.to_vec());
 
-                let new_chain_head = service.get_chain_head();
+                let new_chain_head = service.get_block(new_block_id).unwrap();
                 prev_wait_time = wait_time.clone().as_secs();
-                wait_time = Duration::from_secs(service.get_wait_time(new_chain_head.clone(), &validator_id));
+                wait_time = Duration::from_secs(service.get_wait_time(new_chain_head, &validator_id, &poet_pub_key));
                 info!("New wait time is : {:?}",wait_time);
 
                 published_at_height = true;
@@ -222,15 +224,16 @@ impl Engine for Poet2Engine {
 *
 */
 
-fn check_consensus(block: Block, service: &mut Poet2Service, validator_id: &Vec<u8> ) -> bool {
+fn check_consensus(block: Block, service: &mut Poet2Service, validator_id: &Vec<u8>, 
+                    poet_pub_key: &String) -> bool {
     // 1. Validator registry check
     // 4. Match Local Mean against the locally computed
     // 5. Verfidy BlockDigest is a valid ECDSA of
     //    SHA256 hash of block using OPK
 
     //\\ 2. Signature validation using sender's PPK
-    if !verify_wait_certificate(block.clone())
-    {
+
+    if !verify_wait_certificate(block, service, &poet_pub_key){
         return false;
     }
 
@@ -262,8 +265,10 @@ fn check_consensus(block: Block, service: &mut Poet2Service, validator_id: &Vec<
     true
 }
 
-fn verify_wait_certificate( _block: Block) -> bool{
-    true
+fn verify_wait_certificate( _block: Block, service: &mut Poet2Service, poet_pub_key: &String) -> bool {
+    let prev_block = service.get_block(_block.previous_id.clone()).unwrap();
+    let verify_status = service.verify_wait_certificate(&_block, &prev_block, &poet_pub_key);
+    verify_status
 }
 
 

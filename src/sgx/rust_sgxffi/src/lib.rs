@@ -81,9 +81,9 @@ mod tests {
         println!("Poet Public Key : {}", ppk_str);
 
         let mut duration: u64 = 0x0102030405060708;
-        let prev_cert = "";
+        let mut prev_cert = "";
         let prev_block_id = "abc";
-        let poet_block_id = "xyz";
+        let mut prev_wait_cert_sig = "";
         let validator_id = "123";
         let block_summary = "this is first block";
         let wait_time = 10_u64;
@@ -96,27 +96,37 @@ mod tests {
 
         // initialize wait certificate - to get duration from enclave
         let ret = ffi::initialize_wait_cert(&mut eid, &mut duration,
-                                            &prev_cert, &prev_block_id,
-                                            &poet_block_id, &validator_id).unwrap();
+                                            &prev_cert, &prev_wait_cert_sig,
+                                            &validator_id, &ppk_str.as_str()).unwrap();
         assert_eq!(ret, "Success");
 
         println!("duration inside rust layer 0x{:016x?}", duration);
 
         // finalize wait certificate - to get wait certificate
-        let ret = ffi::finalize_wait_cert(&mut eid, &mut wait_cert_info,
-                                            &prev_block_id, &block_summary,
-                                            &wait_time).unwrap();
+        let ret = ffi::finalize_wait_cert(&mut eid, &mut wait_cert_info, &prev_cert,
+                                         &prev_block_id, &prev_wait_cert_sig,
+                                         &block_summary, &wait_time).unwrap();
         assert_eq!(ret, "Success");
+
+        let wait_cert = ffi::create_string_from_char_ptr(wait_cert_info.ser_wait_cert as *mut c_char);
+        let wait_cert_sign = ffi::create_string_from_char_ptr(wait_cert_info.ser_wait_cert_sign as *mut c_char);
+
+        println!("wait_cert = {:?}", wait_cert);
+        //verify wait certificate
+        let ret = ffi::verify_wait_certificate(&mut eid, &wait_cert.as_str(), &wait_cert_sign.as_str(), &ppk_str.as_str());
+                                               
+        println!("wait certificate verification status = {:?}", ret);
 
         let ret = ffi::release_wait_certificate(&mut eid,
                                                 &mut wait_cert_info).unwrap();
         assert_eq!(ret, "Success");
-
+      
         let ret = ffi::release_signup_info(&mut eid, &mut signup_info).unwrap();
         assert_eq!(ret, "Success");
 
         let ret = ffi::free_enclave(&mut eid).unwrap();
         assert_eq!(ret, "Success");
+
     }
     
 }

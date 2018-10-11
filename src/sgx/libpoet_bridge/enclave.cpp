@@ -476,16 +476,13 @@ namespace sawtooth {
                 "Basename in quote does not match expected value");
         } // Enclave::VerifySignupInfo
         
-        
         void Enclave::Enclave_InitializeWaitCertificate(
             const char* inPreviousWaitCertificate,
             size_t inPreviousWaitCertificateLen, 
             const char* inValidatorId,
             size_t inValidatorIdLen,
-            const char* inPrevBlockId,
-            size_t inPrevBlockIdLen,
-            const char* inPoetBlockId,
-            size_t inPoetBlockIdLen,
+            const sgx_ec256_signature_t* inprevWaitCertificateSig,
+            const sgx_ec256_public_t* inPoetPublicKey,
             uint8_t* duration,
             size_t inDurationLen
             )   
@@ -493,8 +490,8 @@ namespace sawtooth {
     
             ThrowIfNull( inPreviousWaitCertificate, "NULL PreviousWaitCertificate");
             ThrowIfNull( inValidatorId, "NULL ValidatorId");
-            ThrowIfNull( inPoetBlockId, "NULL PoetBlockId");
-            ThrowIfNull( inPrevBlockId, "Wait certificate signature pointer is NULL");
+            ThrowIfNull( inprevWaitCertificateSig, "NULL PreviousWaitCertificateSig");
+            ThrowIfNull( inPoetPublicKey, "NULL PoetPublicKey");
 
             poet_err_t poetRet = POET_SUCCESS;
             sgx_status_t ret =
@@ -505,10 +502,8 @@ namespace sawtooth {
                          inPreviousWaitCertificateLen,
                          inValidatorId,
                          inValidatorIdLen, 
-                         inPrevBlockId, 
-                         inPrevBlockIdLen,
-                         inPoetBlockId,
-                         inPoetBlockIdLen,
+                         inprevWaitCertificateSig,
+                         inPoetPublicKey,
                          duration,
                          inDurationLen] () {
                         sgx_status_t ret = 
@@ -519,10 +514,8 @@ namespace sawtooth {
                                 inPreviousWaitCertificateLen,
                                 inValidatorId, 
                                 inValidatorIdLen,
-                                inPrevBlockId,
-                                inPrevBlockIdLen,
-                                inPoetBlockId,
-                                inPoetBlockIdLen,
+                                inprevWaitCertificateSig,
+                                inPoetPublicKey,
                                 duration,
                                 inDurationLen);
                         return ConvertPoetErrorStatus(ret, poetRet);
@@ -532,8 +525,12 @@ namespace sawtooth {
         }
 
         void Enclave::Enclave_FinalizeWaitCertificate(
+            const char* inPrevWaitCertificate,
+            size_t inPrevWaitCertificateLen,
             const char* inPrevBlockId,
             size_t inPrevBlockIdLen,
+            const char* inPoetBlockId,
+            size_t inPoetBlockIdLen,
             const char* inBlockSummary,
             size_t inBlockSummaryLen,
             uint64_t inWaitTime,
@@ -542,17 +539,23 @@ namespace sawtooth {
             sgx_ec256_signature_t* outWaitCertificateSignature
             )   
         {
-            ThrowIfNull(inPrevBlockId, "NULL PoetBlockId");
+            ThrowIfNull(inPrevWaitCertificate, "NULL PrevWaitCertificate");
+            ThrowIfNull(inPrevBlockId, "NULL PreviousBlockId");
+            ThrowIfNull(inPoetBlockId, "NULL PoetBlockId");
             ThrowIfNull(inBlockSummary, "NULL BlockSummary");
-            ThrowIfNull(inWaitTime, "NULL WaitTime");
+            ThrowIfNull(outSerializedWaitCertificate, "NULL outSerializedWaitCertificate");
 
             poet_err_t poetRet = POET_SUCCESS;
             sgx_status_t ret =
                 this->CallSgx(
                         [this,
                          &poetRet,
+                         inPrevWaitCertificate,
+                         inPrevWaitCertificateLen,
                          inPrevBlockId,
                          inPrevBlockIdLen,
+                         inPoetBlockId,
+                         inPoetBlockIdLen,
                          inBlockSummary,
                          inBlockSummaryLen,
                          inWaitTime,
@@ -563,8 +566,12 @@ namespace sawtooth {
                             ecall_FinalizeWaitCertificate(
                                 this->enclaveId,
                                 &poetRet,
+                                inPrevWaitCertificate,
+                                inPrevWaitCertificateLen,
                                 inPrevBlockId,
                                 inPrevBlockIdLen,
+                                inPoetBlockId,
+                                inPoetBlockIdLen,
                                 inBlockSummary,
                                 inBlockSummaryLen,
                                 inWaitTime,
@@ -601,7 +608,7 @@ namespace sawtooth {
                      inWaitCertificateSignature,
                      inPoetPublicKey] () {
                     sgx_status_t ret =
-                        ecall_VerifyWaitCertificate(
+                        ecall_VerifyWaitCertificateSignature(
                             this->enclaveId,
                             &poetRet,
                             inSerializedWaitCertificate.c_str(),

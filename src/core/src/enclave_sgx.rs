@@ -101,25 +101,24 @@ impl EnclaveConfig {
         self.signup_info.handle = signup.handle;
         self.signup_info.poet_public_key = signup.poet_public_key;
         self.signup_info.poet_public_key_len = signup.poet_public_key_len;
-
     }
 
     pub fn initialize_wait_certificate(
         eid:r_sgx_enclave_id_t,
-        in_prev_cert : String,
-        in_prev_block_id : String,
-        in_poet_block_id : String,
+        in_prev_wait_cert : String,
+        in_prev_wait_cert_sig : String,
         in_validator_id : &Vec<u8>,
+        in_poet_pub_key: &String
         ) -> u64 // duration
     {
 
         let mut duration:u64 = 0_u64;
         let mut eid:r_sgx_enclave_id_t =  eid;
-
         // initialize wait certificate - to get duration from enclave
         ffi::initialize_wait_cert(&mut eid, &mut duration, 
-                                  &in_prev_cert, &in_prev_block_id, &in_poet_block_id,
-        						&poet2_util::to_hex_string(in_validator_id.to_vec())).unwrap();
+                                  &in_prev_wait_cert, &in_prev_wait_cert_sig,
+        						&poet2_util::to_hex_string(in_validator_id.to_vec()),
+                                &in_poet_pub_key).unwrap();
         
         debug!("duration fetched from enclave = {:x?}", duration);
         
@@ -128,7 +127,7 @@ impl EnclaveConfig {
 
     pub fn finalize_wait_certificate(
         eid: r_sgx_enclave_id_t,
-        signup_data: r_sgx_signup_info_t,
+        in_wait_cert: String,
         in_prev_block_id : String,
         in_poet_block_id: String,
         in_block_summary: String,
@@ -143,8 +142,9 @@ impl EnclaveConfig {
                                         ser_wait_cert: 0 as *mut c_char,
                                         ser_wait_cert_sign: 0 as *mut c_char};
 
-    	let ret = ffi::finalize_wait_cert(&mut eid, &mut wait_cert_info, 
-                                            &in_prev_block_id,
+    	let ret = ffi::finalize_wait_cert(&mut eid, &mut wait_cert_info,
+                                            &in_wait_cert, &in_prev_block_id,
+                                            &in_poet_block_id,
                                             &in_block_summary, &in_wait_time);
 
         let wait_cert = ffi::create_string_from_char_ptr(
@@ -159,6 +159,24 @@ impl EnclaveConfig {
         let status = ffi::release_wait_certificate(&mut eid, &mut wait_cert_info);
 
     	(wait_cert, wait_cert_sign)
+    }
+
+    pub fn verify_wait_certificate(
+        eid: r_sgx_enclave_id_t,
+        poet_pub_key: &String,
+        wait_cert: &String,
+        wait_cert_sign: &String)
+        -> bool
+    {
+        let mut eid:r_sgx_enclave_id_t =  eid;
+        let ret = ffi::verify_wait_certificate(&mut eid, &wait_cert.as_str(), &wait_cert_sign.as_str(), &poet_pub_key.as_str());
+        println!("status {:?}", ret);
+        ret
+    }
+
+    pub fn get_poet_pub_key(&mut self, signup_data: r_sgx_signup_info_t) ->String {
+        let poet_pub_key = ffi::create_string_from_char_ptr(signup_data.poet_public_key as *mut c_char);
+        poet_pub_key
     }
     
 }

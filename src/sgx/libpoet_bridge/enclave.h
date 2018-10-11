@@ -85,16 +85,18 @@ namespace sawtooth {
                 size_t inPreviousWaitCertificateLen, 
                 const char* inValidatorId,
                 size_t inValidatorIdLen,
-                const char* inPrevBlockId,
-                size_t inPrevBlockIdLen,
-                const char* inPoetBlockId,
-                size_t inPoetBlockIdLen,
+                const sgx_ec256_signature_t* inPreviousWaitCertificateSig,
+                const sgx_ec256_public_t* inPoetPublicKey,
                 uint8_t* duration,
                 size_t inDurationLen
                 );
             void Enclave_FinalizeWaitCertificate(
+                const char* inPreviousWaitCertificate,
+                size_t inPreviousWaitCertificateLen,
                 const char* inPrevBlockId,
                 size_t inPrevBlockIdLen,
+                const char* inPoetBlockId,
+                size_t inPoetBlockIdLen,
                 const char* inBlockSummary,
                 size_t inBlockSummaryLen,
                 uint64_t inWaitTime,

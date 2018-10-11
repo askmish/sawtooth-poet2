@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #define MAKE_RUST_SGX_TYPE(sgxtype) typedef struct r_##sgxtype { \
                                         intptr_t handle; \
@@ -37,14 +38,18 @@ int r_create_signup_info(r_sgx_enclave_id_t *eid, const char *opk_hash,
 int r_release_signup_info(r_sgx_enclave_id_t *eid, r_sgx_signup_info_t *signup_info);
 
 int r_initialize_wait_certificate(r_sgx_enclave_id_t *eid, uint8_t* duration, 
-                                    const char* prev_cert, const char* prev_block_id,
-                                    const char* poet_block_id, const char* validator_id);
+                                    const char* prev_wait_cert, const char* prev_wait_cert_sig,
+                                    const char* validator_id, const char* poet_pub_key);
 
-int r_finalize_wait_certificate(r_sgx_enclave_id_t* eid, r_sgx_wait_certificate_t* wait_cert, 
-                                const char* prev_block_id, const char* block_summary,
-                                uint64_t wait_time);
+int r_finalize_wait_certificate(r_sgx_enclave_id_t *eid, r_sgx_wait_certificate_t *wait_cert,
+                                const char *prev_wait_cert, 
+                                const char *prev_block_id, const char *poet_block_id,
+                                const char *block_summary, uint64_t wait_time);
 
-int r_release_wait_certificate(r_sgx_enclave_id_t *eid, r_sgx_wait_certificate_t* wait_cert);
+bool r_verify_wait_certificate(r_sgx_enclave_id_t *eid, const char *ppk,
+                               const char *wait_cert, const char *wait_cert_sign); 
+
+int r_release_wait_certificate(r_sgx_enclave_id_t *eid, r_sgx_wait_certificate_t *wait_cert);
 
 #ifdef __cplusplus
 }

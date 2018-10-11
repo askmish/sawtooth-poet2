@@ -46,30 +46,32 @@ enclave {
             );
         
         public poet_err_t ecall_InitializeWaitCertificate(
-            [in, string] const char* inPreviousWaitCertificate,
+            [in, string] const char* inPreviousWaitCertificate, 
             size_t inPreviousWaitCertificateLen, 
             [in, string] const char* inValidatorId, 
             size_t inValidatorIdLen,
-            [in, string] const char* inPrevBlockId,
-            size_t inPrevBlockIdLen,
-            [in, string] const char* inPoetBlockId,
-            size_t inPoetBlockIdLen,
+            [in] const sgx_ec256_signature_t* inPreviousWaitCertificateSig,
+            [in] const sgx_ec256_public_t* inPoetPublicKey,
             [out, size=inDurationLenBytes] uint8_t* outDuration,
             size_t inDurationLenBytes
             );
 
         public poet_err_t ecall_FinalizeWaitCertificate(
-            [in, string] const char* inPrevBlockId,
+            [in, string] const char* inPrevWaitCert,
+            size_t inPrevWaitCertLen,
+            [in, string] const char* inPrevBlockId, 
             size_t inPrevBlockIdLen,
-            [in, string] const char* inBlockSummary,
+            [in, string] const char* inPoetBlockId, 
+            size_t inPoetBlockIdLen,
+            [in, string] const char* inBlockSummary, 
             size_t inBlockSummaryLen,
             uint64_t inWaitTime,
-            [out, size=inSerializedWaitCertificateLen] char* outSerializedWaitCertificate,
-            size_t inSerializedWaitCertificateLen,
+            [out, size=outSerializedWaitCertificateLen] char* outSerializedWaitCertificate, 
+            size_t outSerializedWaitCertificateLen, 
             [out] sgx_ec256_signature_t* outWaitCertificateSignature
             );
 
-        public poet_err_t ecall_VerifyWaitCertificate(
+        public poet_err_t ecall_VerifyWaitCertificateSignature(
             [in, string] const char* inSerializedWaitCertificate,
             [in] const sgx_ec256_signature_t* inWaitCertificateSignature,
             [in] const sgx_ec256_public_t* inPoetPublicKey

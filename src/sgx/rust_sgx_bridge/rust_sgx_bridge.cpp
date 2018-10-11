@@ -90,10 +90,12 @@ int r_create_signup_info(r_sgx_enclave_id_t *eid, const char *opk_hash,
 
 
 int r_initialize_wait_certificate(r_sgx_enclave_id_t *eid, uint8_t* duration, 
-                                  const char* prev_cert, const char* prev_block_id, 
-                                  const char* poet_block_id, const char* validator_id) {
-    if (!eid || (prev_cert == NULL) || (prev_block_id == NULL) 
-          || (validator_id == NULL) || (poet_block_id == NULL)) {
+                                  const char* prev_wait_cert,
+                                  const char* prev_wait_cert_sig, 
+                                  const char* validator_id,
+                                  const char* poet_pub_key) {
+    if (!eid || (prev_wait_cert == NULL) || (prev_wait_cert_sig == NULL) 
+          || (validator_id == NULL) || (poet_pub_key == NULL)) {
        return -1;
     }
 
@@ -101,19 +103,22 @@ int r_initialize_wait_certificate(r_sgx_enclave_id_t *eid, uint8_t* duration,
         return -1;
     }
 
-    poet_err_t ret = initialize_wait_certificate(prev_cert, prev_block_id,
-                                                 poet_block_id, validator_id, 
-                                                 duration, DURATION_LENGTH_BYTES); 
+    poet_err_t ret = initialize_wait_certificate(prev_wait_cert, validator_id,
+                                                 prev_wait_cert_sig, poet_pub_key, duration,
+                                                 DURATION_LENGTH_BYTES); 
     return ret;
 }
 
 int r_finalize_wait_certificate(r_sgx_enclave_id_t* eid, 
-                                r_sgx_wait_certificate_t* wait_cert, 
-                                const char* prev_block_id, 
+                                r_sgx_wait_certificate_t* wait_cert,
+                                const char* prev_wait_cert,
+                                const char* prev_block_id,
+                                const char* poet_block_id,
                                 const char* block_summary,
                                 uint64_t wait_time) {
 
-    if (!eid || (prev_block_id == NULL) || (block_summary == NULL)) {
+    if (!eid || (prev_block_id == NULL) || (poet_block_id == NULL)
+        || (block_summary == NULL)) {
         return -1;
     }
     
@@ -121,9 +126,11 @@ int r_finalize_wait_certificate(r_sgx_enclave_id_t* eid,
         return -1;
     }
 
-    WaitCertificate *wait_certificate = finalize_wait_certificate(prev_block_id, 
-                                                                 block_summary,
-                                                                 wait_time);                                                                 
+    WaitCertificate *wait_certificate = finalize_wait_certificate(prev_wait_cert,
+                                                                  prev_block_id, 
+                                                                  poet_block_id,
+                                                                  block_summary,
+                                                                  wait_time);                                                                 
     if (wait_certificate == NULL) {
       return -1;
     }
@@ -148,6 +155,17 @@ WaitCertificate* validate_wait_certificate(const char* ser_wait_cert,
                                           ser_wait_cert_sig);
 }
 
+bool r_verify_wait_certificate(r_sgx_enclave_id_t *eid, const char *ppk,
+                               const char* wait_cert, const char* wait_cert_sign) {
+    if (!eid || (ppk == NULL) || (wait_cert == NULL) || (wait_cert_sign == NULL)) {
+        return -1;
+    }
+
+    if(eid->handle == 0){
+        return -1;
+    }
+    return _verify_wait_certificate(wait_cert, wait_cert_sign, ppk);
+}
 
 
 int r_release_signup_info(r_sgx_enclave_id_t *eid, r_sgx_signup_info_t *signup_info)

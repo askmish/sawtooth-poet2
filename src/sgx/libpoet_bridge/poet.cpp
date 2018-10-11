@@ -451,10 +451,10 @@ poet_err_t Poet_InitializeWaitCertificate(
     size_t prevWaitCertificateLen, 
     const char* validatorId,
     size_t validatorIdLen,
-    const char* prevBlockId,
-    size_t prevBlockIdLen,
-    const char* poetBlockId,
-    size_t poetBlockIdLen,
+    const char* prevWaitCertificateSig,
+    size_t prevWaitCertificateSigLen,
+    const char* poetPubKey,
+    size_t poetPubKeyLen,
     uint8_t *duration,
     size_t durationLen
     )
@@ -464,18 +464,27 @@ poet_err_t Poet_InitializeWaitCertificate(
         // validate params
         sp::ThrowIfNull(prevWaitCertificate, "NULL PreviousWaitCertificate");
         sp::ThrowIfNull(validatorId, "NULL ValidatorId");
-        sp::ThrowIfNull(prevBlockId, "NULL PreviousBlockId");
-        sp::ThrowIfNull(poetBlockId, "NULL PoetBlockId");
+        sp::ThrowIfNull(prevWaitCertificateSig, "NULL PrevWaitCertificateSig");
+        sp::ThrowIfNull(poetPubKey, "NULL poetPubKey");
+                                  
+        sgx_ec256_signature_t waitCertificateSignature;
+        sgx_ec256_public_t decodedPoetPublicKey;
+
+        // Take the encoded wait certificate signature and PoET public keys and
+        // convert them into something that is more convenient to use internally
+        if (strnlen(prevWaitCertificateSig, prevWaitCertificateSigLen) > 0) {
+            Poet_DecodeSignature(&waitCertificateSignature, prevWaitCertificateSig);
+        } 
+        
+        sp::DecodePublicKey(&decodedPoetPublicKey, poetPubKey);
     
         g_Enclave.Enclave_InitializeWaitCertificate(
             prevWaitCertificate,
             prevWaitCertificateLen,
             validatorId,
             validatorIdLen,
-            prevBlockId,
-            prevBlockIdLen,
-            poetBlockId,
-            poetBlockIdLen,
+            &waitCertificateSignature,
+            &decodedPoetPublicKey,
             duration,
             durationLen);
 
@@ -494,8 +503,12 @@ poet_err_t Poet_InitializeWaitCertificate(
 } // Poet_InitialzeWaitCertificate
 
 poet_err_t Poet_FinalizeWaitCertificate(
+    const char* prevWaitCertificate,
+    size_t prevWaitCertificateLen,
     const char* prevBlockId,
     size_t prevBlockIdLen,
+    const char* poetBlockId,
+    size_t poetBlockIdLen,
     const char* blockSummary,
     size_t blockSummaryLen,
     uint64_t waitTime,
@@ -508,15 +521,20 @@ poet_err_t Poet_FinalizeWaitCertificate(
     poet_err_t ret = POET_SUCCESS;
     try {
         // validate params
+        sp::ThrowIfNull(prevWaitCertificate, "NULL PrevWaitCertificate");
         sp::ThrowIfNull(prevBlockId, "NULL PoetBlockId");
+        sp::ThrowIfNull(poetBlockId, "NULL PoetBlockId");
         sp::ThrowIfNull(blockSummary, "NULL BlockSummary");
-        sp::ThrowIfNull(waitTime, "NULL WaitTime");
-            
+   
         sgx_ec256_signature_t waitCertificateSignature;
 
         g_Enclave.Enclave_FinalizeWaitCertificate(
+            prevWaitCertificate,
+            prevWaitCertificateLen,
             prevBlockId,
             prevBlockIdLen,
+            poetBlockId,
+            poetBlockIdLen,
             blockSummary,
             blockSummaryLen,
             waitTime,

@@ -217,10 +217,10 @@ extern "C" {
     	size_t prevWaitCertificateLen, 
     	const char* validatorId,
     	size_t validatorIdLen,
-    	const char* prevBlockId,
-    	size_t prevBlockIdLen,
-        const char* poetBlockId,
-        size_t poetBlockIdLen,
+    	const char* prevWaitCertificateSig,
+        size_t prevWaitCertificateSigLen,
+        const char* poetPublicKey,
+        size_t poetPublicKeyLen,
     	uint8_t *duration,
         size_t durationLen
     	);
@@ -231,8 +231,12 @@ extern "C" {
     */
 
     POET_FUNC poet_err_t Poet_FinalizeWaitCertificate(
+        const char* prevWaitCertificate,
+        size_t prevWaitCertificateLen,
     	const char* prevBlockId,
     	size_t prevBlockIdLen,
+        const char* poetBlockId,
+        size_t poetBlockIdLen,
     	const char* blockSummary,
     	size_t blockSummaryLen,
         uint64_t waitTime,

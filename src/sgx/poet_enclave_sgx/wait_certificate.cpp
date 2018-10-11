@@ -70,7 +70,9 @@ bool _verify_wait_certificate(
 }
 
 WaitCertificate::WaitCertificate(
+    const std::string& prevWaitCertificate,
     const std::string& prevBlockId,
+    const std::string& poetBlockId,
     const std::string& blockSummary,
     uint64_t waitTime
     )
@@ -80,8 +82,12 @@ WaitCertificate::WaitCertificate(
 
     poet_err_t ret =
         Poet_FinalizeWaitCertificate(
+            prevWaitCertificate.c_str(),
+            prevWaitCertificate.length(),
             prevBlockId.c_str(),
             prevBlockId.length(),
+            poetBlockId.c_str(),
+            poetBlockId.length(),
             blockSummary.c_str(),
             blockSummary.length(),
             waitTime,
@@ -101,8 +107,8 @@ WaitCertificate::WaitCertificate(
 poet_err_t WaitCertificate::_InitializeWaitCertificate(
     const std::string& prevWaitCertificate,
     const std::string& validatorId,
-    const std::string& prevBlockId,
-    const std::string& poetBlockId,
+    const std::string& prevWaitCertificateSig,
+    const std::string& poetPubKey,
     uint8_t *duration,
     size_t durationLen
     )
@@ -113,10 +119,10 @@ poet_err_t WaitCertificate::_InitializeWaitCertificate(
             prevWaitCertificate.length(),
             validatorId.c_str(),
             validatorId.length(),
-            prevBlockId.c_str(),
-            prevBlockId.length(),
-            poetBlockId.c_str(),
-            poetBlockId.length(),
+            prevWaitCertificateSig.c_str(),
+            prevWaitCertificateSig.length(),
+            poetPubKey.c_str(),
+            poetPubKey.length(),
             duration,
             durationLen
             );
@@ -126,34 +132,39 @@ poet_err_t WaitCertificate::_InitializeWaitCertificate(
 } // WaitCertificate::_InitializeWaitCertificate
 
 WaitCertificate* WaitCertificate::_FinalizeWaitCertificate(
+    const std::string& prevWaitCertificate,
     const std::string& prevBlockId,
+    const std::string& poetBlockId,
     const std::string& blockSummary,
     uint64_t waitTime
     )
 { 
-    return new WaitCertificate(prevBlockId, blockSummary, waitTime);
+    return new WaitCertificate(prevWaitCertificate, prevBlockId, poetBlockId, blockSummary, waitTime);
 } // WaitCertificate::_FinalizeWaitCertificate
 
 
 poet_err_t initialize_wait_certificate(
     const std::string& prevWaitCertificate,
-    const std::string& prevBlockId,
     const std::string& validatorId,
-    const std::string& poetBlockId,
+    const std::string& prevWaitCertificateSig,
+    const std::string& poetPubKey,
     uint8_t *duration,
     size_t durationLen
     )
 { 
-    return WaitCertificate::_InitializeWaitCertificate( prevWaitCertificate, validatorId, prevBlockId, poetBlockId, duration, durationLen);
+    return WaitCertificate::_InitializeWaitCertificate(prevWaitCertificate, validatorId,
+                                    prevWaitCertificateSig, poetPubKey, duration, durationLen);
 }
 
 WaitCertificate* finalize_wait_certificate(
+    const std::string& prevWaitCertificate,
     const std::string& prevBlockId,
+    const std::string& poetBlockId,
     const std::string& blockSummary,
     uint64_t waitTime
     )
 {
-    return WaitCertificate::_FinalizeWaitCertificate( prevBlockId, blockSummary, waitTime);
+    return WaitCertificate::_FinalizeWaitCertificate(prevWaitCertificate, prevBlockId, poetBlockId, blockSummary, waitTime);
 }
 
 void _destroy_wait_certificate(WaitCertificate *waitCert)

@@ -335,17 +335,14 @@ poet_err_t ecall_InitializeWaitCertificate(
     size_t inPreviousWaitCertificateLen, 
     const char* inValidatorId, 
     size_t inValidatorIdLen,
-    const char* inPrevBlockId,
-    size_t inPrevBlockIdLen,
-    const char* inPoetBlockId,
-    size_t inPoetBlockIdLen,
+    const sgx_ec256_signature_t* inPreviousWaitCertificateSig,
+    const sgx_ec256_public_t* inPoetPublicKey,
     uint8_t* outDuration,
     size_t inDurationLenBytes
     ) 
 {
     poet_err_t result = POET_SUCCESS;
     try{
-       
         sp::ThrowIfNull(
             inPreviousWaitCertificate,
             "Previous wait certificate is NULL. It can be empty but not NULL");
@@ -355,12 +352,12 @@ poet_err_t ecall_InitializeWaitCertificate(
             "Validator ID is NULL");
 
         sp::ThrowIfNull(
-            inPrevBlockId,
-            "Previous block ID is NULL. It can be empty but not NULL");
+            inPreviousWaitCertificateSig,
+            "Previous Wait certificate signature is NULL");
 
         sp::ThrowIfNull(
-            inPoetBlockId,
-            "Poet block ID is NULL");
+            inPoetPublicKey,
+            "Poet public key is NULL");
 
         sp::ThrowIfNull(
             outDuration,
@@ -374,28 +371,37 @@ poet_err_t ecall_InitializeWaitCertificate(
         createDuration(duration, DURATION_LENGTH_BYTES);
 
         //Check if its first block. And validate for null terminated string and 
-        // the length of string is matching with inPreviousWaitCertificateLen
-        if( strnlen(inPreviousWaitCertificate, inPreviousWaitCertificateLen + 1) != inPreviousWaitCertificateLen ) {
-
-            sp::ThrowIf<sp::ValueError>((gWaitCertData.block_num == 0), 
-                                            "Block number cannot be zero if previous wait cerificate is not empty");
-
-            uint64_t blockNum = getBlockNumFromSerializedWaitCert(inPreviousWaitCertificate);
-            
-            sp::ThrowIf<sp::ValueError>((blockNum <= gWaitCertData.block_num), 
-                                            "wait certificate has intialized before for the block");
-
-            gWaitCertData.block_num = blockNum + 1;
-            gWaitCertData.waitCert.block_num = blockNum + 1;
+        // the length of string is matching with inPreviousWaitCertificateLen  
+        const size_t prevWaitCertLen = strnlen(inPreviousWaitCertificate, inPreviousWaitCertificateLen + 1);
+        uint64_t prevBlockNum = 0;
+        if ( (gWaitCertData.block_num == 0) && (prevWaitCertLen == 0) && (inPreviousWaitCertificate[0] == 0) ) {
+            prevBlockNum = 0;
         } else {
-            gWaitCertData.block_num = 0;
-            gWaitCertData.waitCert.block_num = 0;
+            sp::ThrowIf<sp::ValueError>((inPreviousWaitCertificateLen == 0), 
+                                            "Wait certificate length cannot be zero");
+            if (prevWaitCertLen != inPreviousWaitCertificateLen) {
+                sp::ThrowIf<sp::ValueError>(true, 
+                    "Wait certificate length mismatch");
+            }
+
+            //Verify if Wait certificate and Wait certificate signature are valid
+            if(ecall_VerifyWaitCertificateSignature(inPreviousWaitCertificate, inPreviousWaitCertificateSig, inPoetPublicKey)) {
+                sp::ThrowIf<sp::ValueError>(true, 
+                                            "Wait certificate and Signature do not match");
+            }
+            prevBlockNum = getBlockNumFromSerializedWaitCert(inPreviousWaitCertificate);
         }
 
-        gWaitCertData.waitCert.validator_id = inValidatorId;
-        gWaitCertData.waitCert.previous_block_id = inPrevBlockId;
-        gWaitCertData.waitCert.poet_block_id = inPoetBlockId;
+        size_t currBlockNum = prevBlockNum + 1;
+        
+        if (currBlockNum > prevBlockNum + 1) {
+            sp::ThrowIf<sp::ValueError>(true, 
+                                        "wait certificate cannot be issued for older block");
+        }
 
+        gWaitCertData.waitCert.block_num = gWaitCertData.block_num = currBlockNum;
+        gWaitCertData.waitCert.validator_id = inValidatorId;
+        
         //block summary will be filled in finalize wait certificate
         gWaitCertData.waitCert.block_summary.clear();
 
@@ -428,22 +434,36 @@ poet_err_t ecall_InitializeWaitCertificate(
 } //ecall_InitializeWaitCertificate
 
 poet_err_t ecall_FinalizeWaitCertificate(
+    const char* inPreviousWaitCertificate,
+    size_t inPreviousWaitCertificateLen,
     const char* inPrevBlockId, 
-    size_t inPrevBlockIdLen, 
+    size_t inPrevBlockIdLen,
+    const char* inPoetBlockId, 
+    size_t inPoetBlockIdLen,
     const char* inBlockSummary, 
     size_t inBlockSummaryLen,
     uint64_t inWaitTime,
     char* outSerializedWaitCertificate, 
-    size_t outSerializedWaitCertificateLen, 
+    size_t outSerializedWaitCertificateLen,
     sgx_ec256_signature_t* outWaitCertificateSignature)
 {
     poet_err_t result = POET_SUCCESS;
 
     try{    
         sp::ThrowIfNull(
+            inPreviousWaitCertificate,
+            "Previous wait certificate is NULL");
+
+        sp::ThrowIfNull(
             inPrevBlockId,
             "Previous BlockId is NULL");
+        sp::ThrowIf<sp::ValueError>(!inPrevBlockIdLen, 
+                   "Previous BlockId length must be non-zero");
 
+        sp::ThrowIfNull(
+            inPoetBlockId,
+            "Poet BlockId is NULL");
+       
         sp::ThrowIfNull(
             inBlockSummary,
             "Block Summary is NULL");
@@ -451,13 +471,7 @@ poet_err_t ecall_FinalizeWaitCertificate(
         sp::ThrowIf<sp::ValueError>(!inBlockSummaryLen, 
                    "Block summary length must be non-zero");
 
-        sp::ThrowIfNull(
-            inWaitTime,
-            "Wait time is NULL");
-
-        sp::ThrowIfNull(
-            outSerializedWaitCertificate,
-            "output parameter outSerializedWaitCertificate is NULL");
+        sp::ThrowIfNull(outSerializedWaitCertificate, "Output parameter OutSerializedWaitCertificate is NULL");
         
         sp::ThrowIfNull(
             outWaitCertificateSignature,
@@ -469,14 +483,23 @@ poet_err_t ecall_FinalizeWaitCertificate(
         sp::ThrowIf<sp::ValueError>(!gWaitCertData.initialized, 
                     "Wait certificate not initialized. Cannot finalize wait certificate");
 
-        if( strncmp(inPrevBlockId, gWaitCertData.waitCert.previous_block_id.c_str(), inPrevBlockIdLen ) != 0 ){
-
-            sp::ThrowIf<sp::ValueError>(true, 
-                    "Previous Block Id is not matching with initialized wait certificate block id");
+        const size_t prevWaitCertLen = strnlen(inPreviousWaitCertificate, inPreviousWaitCertificateLen + 1);
+        if((inPreviousWaitCertificateLen == 0) && (inPreviousWaitCertificate[0] == 0)) {
         }
-
-        gWaitCertData.waitCert.block_summary = (char*)inBlockSummary;
+        else {
+            size_t prevBlockNum = getBlockNumFromSerializedWaitCert(inPreviousWaitCertificate);
+            size_t currBlockNum = prevBlockNum + 1;
+            if(currBlockNum != gWaitCertData.waitCert.block_num) {
+                sp::ThrowIf<sp::ValueError>(true, 
+                    "Block number in wait certificate does not match");
+            }
+        }
+        
+        gWaitCertData.waitCert.previous_block_id = (char *)inPrevBlockId;
+        gWaitCertData.waitCert.poet_block_id = (char *)inPoetBlockId;
+        gWaitCertData.waitCert.block_summary = (char *)inBlockSummary;
         gWaitCertData.waitCert.wait_time = inWaitTime;
+        
         // serialize final wait certificate
         JsonValue waitCertValue(json_value_init_object());
         sp::ThrowIf<sp::RuntimeError>(
@@ -519,7 +542,7 @@ poet_err_t ecall_FinalizeWaitCertificate(
         sp::ThrowIf<sp::RuntimeError>( jret != JSONSuccess, "WaitCertificate serialization failed.");
 
         Intel::SgxEcc256StateHandle eccStateHandle;
-            
+        
         sgx_status_t ret = sgx_ecc256_open_context(&eccStateHandle);
         sp::ThrowSgxError(ret, "Failed to create ECC256 context");
             
@@ -549,7 +572,7 @@ poet_err_t ecall_FinalizeWaitCertificate(
 
 
 
-poet_err_t ecall_VerifyWaitCertificate(
+poet_err_t ecall_VerifyWaitCertificateSignature(
     const char* inSerializedWaitCertificate,
     const sgx_ec256_signature_t* inWaitCertificateSignature,
     const sgx_ec256_public_t* inPoetPublicKey
@@ -701,6 +724,7 @@ void createDuration(uint8_t* duration, size_t inDurationLenBytes) {
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 uint64_t getBlockNumFromSerializedWaitCert(const char* waitCert) {
+
     JsonValue parsed(json_parse_string(waitCert));
     sp::ThrowIf<sp::ValueError>(!parsed.value, "Failed to parse SerializedWaitCertificate");
     JSON_Object* pObject = json_value_get_object(parsed);

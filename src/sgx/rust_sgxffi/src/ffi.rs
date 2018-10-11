@@ -73,24 +73,25 @@ pub fn create_signup_info(eid: &mut r_sgx_enclave_id_t, opk_hash: &str,
 }
 
 pub fn initialize_wait_cert(eid: &mut r_sgx_enclave_id_t, duration: &mut u64, 
-                            prev_cert: &str, prev_block_id: &str, poet_block_id: &str,
-                            validator_id: &str) -> Result<String,String> {    
+                            prev_wait_cert: &str, prev_wait_cert_sig: &str,
+                            validator_id: &str,
+                            poet_pub_key: &str) -> Result<String,String> {    
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;
         
         let mut duration_arr: [u8; 8] =  [0;8];
-       
+
         let duration_ptr = duration_arr.as_mut_ptr();
-        let prev_cert_cstring = CString::new(prev_cert).unwrap();
-        let prev_block_id_cstring = CString::new(prev_block_id).unwrap();
-        let poet_block_id_cstring = CString::new(poet_block_id).unwrap();
+        let prev_wait_cert_cstring = CString::new(prev_wait_cert).unwrap();
+        let prev_wait_cert_sig_cstring = CString::new(prev_wait_cert_sig).unwrap();
         let validator_id_ctring = CString::new(validator_id).unwrap();
+        let poet_pub_key_cstring = CString::new(poet_pub_key).unwrap();
         let wait_cert_init_status = r_initialize_wait_certificate(eid_ptr, 
                                         duration_ptr, 
-                                        prev_cert_cstring.as_ptr(), 
-                                        prev_block_id_cstring.as_ptr(),
-                                        poet_block_id_cstring.as_ptr(),
-                                        validator_id_ctring.as_ptr());  
+                                        prev_wait_cert_cstring.as_ptr(),
+                                        prev_wait_cert_sig_cstring.as_ptr(),
+                                        validator_id_ctring.as_ptr(),
+                                        poet_pub_key_cstring.as_ptr());  
 
         //convert u8 array to u64 duration
         *duration = transmute::<[u8; 8], u64>(duration_arr).to_le();
@@ -104,20 +105,24 @@ pub fn initialize_wait_cert(eid: &mut r_sgx_enclave_id_t, duration: &mut u64,
 }
 
 pub fn finalize_wait_cert(eid: &mut r_sgx_enclave_id_t, 
-                          wait_cert_info: &mut r_sgx_wait_certificate_t, 
-                          prev_block_id: &str, block_summary: &str, 
+                          wait_cert_info: &mut r_sgx_wait_certificate_t,
+                          prev_wait_cert: &str,
+                          prev_block_id: &str, poet_block_id: &str,
+                          block_summary: &str, 
                           wait_time: &u64) -> Result<String,String> {
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;
         let wait_cert_ptr = wait_cert_info  as *mut r_sgx_wait_certificate_t;
+        let prev_wait_cert_cstring = CString::new(prev_wait_cert).unwrap();
         let prev_block_id_cstring = CString::new(prev_block_id).unwrap();
+        let poet_block_id_cstring = CString::new(poet_block_id).unwrap();
         let block_summary_cstring = CString::new(block_summary).unwrap();
 
-        println!("invoking r_finalize_wait_certificate");
-        println!("wait_time inside ffi:: {:?}", *wait_time);
         let wait_cert_final_status = r_finalize_wait_certificate(eid_ptr, 
                                                 wait_cert_ptr, 
-                                                prev_block_id_cstring.as_ptr(), 
+                                                prev_wait_cert_cstring.as_ptr(),
+                                                prev_block_id_cstring.as_ptr(),
+                                                poet_block_id_cstring.as_ptr(),
                                                 block_summary_cstring.as_ptr(),
                                                 *wait_time);
 
@@ -125,6 +130,25 @@ pub fn finalize_wait_cert(eid: &mut r_sgx_enclave_id_t,
             0 => Ok("Success".to_string()),
             _ => Err("Finalize certificate failed".to_string()),
         }
+    }
+}
+
+pub fn verify_wait_certificate(eid: &mut r_sgx_enclave_id_t,
+                               wait_cert: &str,
+                               wait_cert_sign: &str,
+                               ppk: &str) -> bool {
+    unsafe {
+        
+        let eid_ptr = eid as *mut r_sgx_enclave_id_t;
+        let wait_cert_cstring = CString::new(wait_cert).unwrap();
+
+        let wait_cert_sign_cstring = CString::new(wait_cert_sign).unwrap();
+
+        let ppk_cstring = CString::new(ppk).unwrap();
+        let status = r_verify_wait_certificate(eid_ptr, ppk_cstring.as_ptr(),
+                                               wait_cert_cstring.as_ptr(),
+                                               wait_cert_sign_cstring.as_ptr());
+        status
     }
 }
 

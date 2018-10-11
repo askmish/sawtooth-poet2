@@ -99,13 +99,15 @@ class WaitCertificate
     static poet_err_t _InitializeWaitCertificate(
         const std::string& prevWaitCertificate,
         const std::string& validatorId,
-        const std::string& prevBlockId,
-        const std::string& poetBlockId,
+        const std::string& prevWaitCertificateSig,
+        const std::string& poetPubKey,
         uint8_t *duration,
         size_t durationLen
         );
     static WaitCertificate* _FinalizeWaitCertificate(
+        const std::string& prevWaitCertificate,
         const std::string& prevBlockId,
+        const std::string& poetBlockId,
         const std::string& blockSummary,
         uint64_t waitTime
         );
@@ -146,6 +148,8 @@ class WaitCertificate
 
 protected:
     WaitCertificate(
+        const std::string& prevWaitCertificate,
+        const std::string& prevBlockId,
         const std::string& poetBlockId,
         const std::string& blockSummary,
         uint64_t waitTime
@@ -166,14 +170,16 @@ WaitCertificate* deserialize_wait_certificate(
 poet_err_t initialize_wait_certificate(
     const std::string& prevWaitCertificate,
     const std::string& validatorId,
-    const std::string& prevBlockId,
-    const std::string& poetBlockId,
+    const std::string& prevWaitCertificateSig,
+    const std::string& poetPubKey,
     uint8_t *duration,
     size_t durationLen
     );
 
 WaitCertificate* finalize_wait_certificate(
+    const std::string& prevWaitCertificate,
     const std::string& prevBlockId,
+    const std::string& poetBlockId,
     const std::string& blockSummary,
     uint64_t waitTime
     );

@@ -33,3 +33,4 @@ src/ias_proxy/target/**
 *.lock
 
 src/build/*
+src/sgx/rust_sgxffi/target/*

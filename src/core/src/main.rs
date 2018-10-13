@@ -33,6 +33,9 @@ extern crate zmq;
 extern crate crypto;
 extern crate bincode;
 extern crate sgxffi;
+extern crate hyper;
+extern crate ias_client;
+extern crate tokio_core;
 
 pub mod engine;
 pub mod service;

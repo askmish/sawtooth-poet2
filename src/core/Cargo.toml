@@ -36,6 +36,9 @@ lmdb-zero = ">=0.4.1"
 rust-crypto = "^0.2"
 bincode = "1.0.1"
 rust_sgxffi = { path = "../sgx/rust_sgxffi"}
+hyper = "0.12.11"
+ias_client = { path = "../ias_client" }
+tokio-core = "0.1.17"
 
 [package.metadata.deb]
 assets = [

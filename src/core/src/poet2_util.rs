@@ -17,12 +17,17 @@
 
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
+use hyper::{Body, Client, Method, Request, Uri};
+use hyper::header;
+use hyper::header::HeaderValue;
+use ias_client::client_utils::read_body_as_string_from_response;
 use sawtooth_sdk::consensus::{engine::*};
 use sawtooth_sdk::signing::{create_context, PrivateKey, Signer};
 use sawtooth_sdk::signing::secp256k1::Secp256k1PrivateKey;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use tokio_core::reactor::Core;
 
 const WC_DELIM_CHAR: u8 = '#' as u8; //0x23
 
@@ -74,4 +79,30 @@ pub fn sha512_from_str(input_value: &str) -> String {
     let mut sha512_calculator = Sha512::new();
     sha512_calculator.input_str(input_value);
     sha512_calculator.result_str()
+}
+
+// Sends the BatchList to the REST API
+pub fn send_to_rest_api(api: &str, raw_bytes: Vec<u8>) -> String {
+    let body_length = raw_bytes.len();
+    let bytes = Body::from(raw_bytes);
+    let rest_api = "http://rest-api:8008/".to_owned() + api;
+    let uri = rest_api.as_str().parse::<Uri>().unwrap();
+    let client = Client::new();
+    let mut request = Request::new(bytes);
+    *request.method_mut() = Method::POST;
+    *request.uri_mut() = uri;
+    request.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/octet-stream"),
+    );
+    request.headers_mut().insert(
+        header::CONTENT_LENGTH,
+        HeaderValue::from(body_length),
+    );
+    let response = client.request(request);
+    let mut runner = Core::new().unwrap();
+    match runner.run(read_body_as_string_from_response(response, None)) {
+        Ok(got_response) => got_response,
+        Err(error) => panic!("Unable to read response; More details {}", error),
+    }
 }

@@ -17,7 +17,7 @@
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
-use poet2_util::{read_file_as_string, sha256_from_str, sha512_from_str};
+use poet2_util::{read_file_as_string, sha256_from_str, sha512_from_str, send_to_rest_api};
 use protobuf::{Message, RepeatedField};
 use sawtooth_sdk::messages::batch::{Batch, BatchHeader, BatchList};
 use sawtooth_sdk::messages::transaction::{Transaction, TransactionHeader};
@@ -35,7 +35,7 @@ static CONFIGSPACE_NAMESPACE: &str = "000000";
 
 /// This utility generates a validator registry transaction and sends it.
 /// In other words acts as client for validator registry TP.
-fn do_create_registration(signer_key: String, block_id: &[u8]) -> () {
+fn do_create_registration(signer_key: String, block_id: &[u8]) -> String {
 
     // Default path: /etc/sawtooth/keys/validator.priv
     let read_key = if signer_key.is_empty() {
@@ -98,6 +98,8 @@ fn do_create_registration(signer_key: String, block_id: &[u8]) -> () {
                                       String::from(payload));
     let batch = get_batch(signer, transaction);
     let batch_list = get_batch_list(batch);
+    // call the API with bytes to be sent
+    send_to_rest_api("batches", batch_list.write_to_bytes().unwrap().to_vec())
 }
 
 // TODO: Generalize following method to accept any number of batches, to use it as utility

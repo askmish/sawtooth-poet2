@@ -158,13 +158,13 @@ poet_err_t Poet_Terminate()
 } // Poet_Terminate
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POET_FUNC size_t Poet_GetEpidGroupSize()
+size_t Poet_GetEpidGroupSize()
 {
     return HEX_STRING_SIZE(sizeof(sgx_epid_group_id_t));
 } // Poet_GetEpidGroupSize
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POET_FUNC size_t Poet_GetEnclaveMeasurementSize()
+size_t Poet_GetEnclaveMeasurementSize()
 {
     return
         HEX_STRING_SIZE(
@@ -172,7 +172,7 @@ POET_FUNC size_t Poet_GetEnclaveMeasurementSize()
 } // Poet_GetEnclaveMeasurementSize
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POET_FUNC size_t Poet_GetEnclaveBasenameSize()
+size_t Poet_GetEnclaveBasenameSize()
 {
     return
         HEX_STRING_SIZE(
@@ -180,13 +180,13 @@ POET_FUNC size_t Poet_GetEnclaveBasenameSize()
 } // Poet_GetEnclaveBasenameSize
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POET_FUNC size_t Poet_GetWaitCertificateSize()
+size_t Poet_GetWaitCertificateSize()
 {
     return 2*1024; // Empirically these are big enough
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POET_FUNC size_t Poet_GetSignatureSize()
+size_t Poet_GetSignatureSize()
 {
     // We encode the components of the signature separately to avoid
     // potential for struct alignment issues
@@ -197,13 +197,13 @@ POET_FUNC size_t Poet_GetSignatureSize()
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POET_FUNC size_t Poet_GetPublicKeySize()
+size_t Poet_GetPublicKeySize()
 {
     return sp::EncodedPublicKeySize();
 } // Poet_GetPublicKeySize
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POET_FUNC size_t Poet_GetEnclaveQuoteSize()
+size_t Poet_GetEnclaveQuoteSize()
 {
     return BASE64_SIZE(g_Enclave.GetQuoteSize());
 } // Poet_GetEnclaveQuoteSize
@@ -343,7 +343,7 @@ poet_err_t Poet_SetSignatureRevocationList(
 } // Poet_SetSignatureRevocationList
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POET_FUNC poet_err_t Poet_CreateSignupData(
+poet_err_t Poet_CreateSignupData(
     const char* inOriginatorPublicKeyHash,
     char* outPoetPublicKey,
     size_t inPoetPublicKeySize,
@@ -564,7 +564,7 @@ poet_err_t Poet_FinalizeWaitCertificate(
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POET_FUNC poet_err_t Poet_VerifyWaitCertificate(
+poet_err_t Poet_VerifyWaitCertificate(
     const char* inSerializedWaitCertificate,
     const char* inWaitCertificateSignature,
     const char* inPoetPublicKey

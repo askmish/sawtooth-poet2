@@ -43,7 +43,7 @@
 
 #include "parson.h"
 
-#include "poet.h"
+#include "poet_defs.h"
 #include "error.h"
 #include "zero.h"
 #include "hex_string.h"

@@ -17,58 +17,22 @@
 
 #pragma once
 
-#include "shared_library.h"
+#include "poet_defs.h"
 #include <stdlib.h>
 #include <stdint.h>
 
-#ifdef LIBPOET_BUILD
-    #define POET_FUNC   SHARED_LIBRARY_EXPORT
-#else
-    #define POET_FUNC   SHARED_LIBRARY_IMPORT
-#endif // LIBPOET_BUILD
 
 #ifdef __cplusplus
 extern "C" {
 #endif // _cplusplus
 
-    typedef enum {
-        POET_SUCCESS=0,
-        POET_ERR_UNKNOWN=-1,
-        POET_ERR_MEMORY=-2,
-        POET_ERR_IO =-3,
-        POET_ERR_RUNTIME=-4,
-        POET_ERR_INDEX=-5,
-        POET_ERR_DIVIDE_BY_ZERO=-6,
-        POET_ERR_OVERFLOW =-7,
-        POET_ERR_VALUE =-8,
-        POET_ERR_SYSTEM =-9,
-        POET_ERR_SYSTEM_BUSY =-10   /*
-                                        Indicates that the system is busy and
-                                        the operation may be retried again.  If
-                                        retries fail this should be converted to
-                                        a POET_ERR_SYSTEM for reporting.
-                                    */
-    } poet_err_t;
-
-    typedef enum {
-        POET_LOG_DEBUG = 0,
-        POET_LOG_INFO = 1,
-        POET_LOG_WARNING = 2,
-        POET_LOG_ERROR = 3,
-        POET_LOG_CRITICAL = 4,
-    } poet_log_level_t;
-
-    typedef void (*poet_log_t)(
-        poet_log_level_t,
-        const char* message
-        );
 
     #define POET_IDENTIFIER_LENGTH 16
 
     /*
         Tests if libpoet is built against the SGX simulator or the SGX runtime
     */
-    POET_FUNC int Poet_IsSgxSimulator();
+    int Poet_IsSgxSimulator();
 
     /*
         Returns the string associated with the last PoET error message.
@@ -77,7 +41,7 @@ extern "C" {
             contain the message associated with the error code returned.
         inMessageLength - The size of the buffer pointed to by outMessage.
     */
-    POET_FUNC poet_err_t Poet_GetLastErrorMessage(
+    poet_err_t Poet_GetLastErrorMessage(
         char* outMessage,
         size_t inMessageLength
         );
@@ -92,7 +56,7 @@ extern "C" {
         inSpid - A pointer to a string that contains the hex encoded SPID.
         logFunction - A pointer to the PoET log function.
     */
-    POET_FUNC poet_err_t Poet_Initialize(
+    poet_err_t Poet_Initialize(
         const char* inPathToEnclave,
         const char* inSpid,
         poet_log_t logFunction
@@ -101,19 +65,19 @@ extern "C" {
     /*
         Stop the poet services
     */
-    POET_FUNC poet_err_t Poet_Terminate();
+    poet_err_t Poet_Terminate();
 
     /*
         Helper functions to determine buffer sizes for outgoing buffers filled
         in by enclave.
     */
-    POET_FUNC size_t Poet_GetEpidGroupSize();
-    POET_FUNC size_t Poet_GetEnclaveMeasurementSize();
-    POET_FUNC size_t Poet_GetEnclaveBasenameSize();
-    POET_FUNC size_t Poet_GetWaitCertificateSize();
-    POET_FUNC size_t Poet_GetSignatureSize();
-    POET_FUNC size_t Poet_GetPublicKeySize();
-    POET_FUNC size_t Poet_GetEnclaveQuoteSize();
+    size_t Poet_GetEpidGroupSize();
+    size_t Poet_GetEnclaveMeasurementSize();
+    size_t Poet_GetEnclaveBasenameSize();
+    size_t Poet_GetWaitCertificateSize();
+    size_t Poet_GetSignatureSize();
+    size_t Poet_GetPublicKeySize();
+    size_t Poet_GetEnclaveQuoteSize();
 
     /*
         Returns the EPID group as a Hex(base 16) encoded string.
@@ -124,7 +88,7 @@ extern "C" {
             The value to provide for this parameter may be obtained by calling
             Poet_GetEpidGroupSize().
     */
-    POET_FUNC poet_err_t Poet_GetEpidGroup(
+    poet_err_t Poet_GetEpidGroup(
         char* outEpidGroup,
         size_t inEpidGroupLength
         );
@@ -144,7 +108,7 @@ extern "C" {
             outEnclaveBasename.  The value to provide for this parameter may
             be obtained by calling Poet_GetEnclaveBasenameSize().
     */
-    POET_FUNC poet_err_t Poet_GetEnclaveCharacteristics(
+    poet_err_t Poet_GetEnclaveCharacteristics(
         char* outMrEnclave,
         size_t inMrEnclaveLength,
         char* outEnclaveBasename,
@@ -158,7 +122,7 @@ extern "C" {
         inSignatureRevocationList - A string containing the signature
             revocation list obtained from IAS.
     */
-    POET_FUNC poet_err_t Poet_SetSignatureRevocationList(
+    poet_err_t Poet_SetSignatureRevocationList(
         const char* inSignatureRevocationList
         );
 
@@ -179,7 +143,7 @@ extern "C" {
             outEnclaveQuote.  The value to provide for this parameter may be
             obtained by calling Poet_GetEnclaveQuoteSize().
     */
-    POET_FUNC poet_err_t Poet_CreateSignupData(
+    poet_err_t Poet_CreateSignupData(
         const char* inOriginatorPublicKeyHash,
         char* outPoetPublicKey,
         size_t inPoetPublicKeySize,
@@ -199,7 +163,7 @@ extern "C" {
             enclave quote that the other validator provided to IAS when it
             created its signup information.
     */
-    POET_FUNC poet_err_t Poet_VerifySignupInfo(
+    poet_err_t Poet_VerifySignupInfo(
         const char* inOriginatorPublicKeyHash,
         const char* inPoetPublicKey,
         const char* inEnclaveQuote
@@ -212,7 +176,7 @@ extern "C" {
         prevBlockId - string representation of hash of previous block
     */
 
-    POET_FUNC poet_err_t Poet_InitializeWaitCertificate(
+    poet_err_t Poet_InitializeWaitCertificate(
     	const char* prevWaitCertificate,
     	size_t prevWaitCertificateLen, 
     	const char* validatorId,
@@ -230,7 +194,7 @@ extern "C" {
         blockSummary - string representation of hash of all transactions in a block
     */
 
-    POET_FUNC poet_err_t Poet_FinalizeWaitCertificate(
+    poet_err_t Poet_FinalizeWaitCertificate(
         const char* prevWaitCertificate,
         size_t prevWaitCertificateLen,
     	const char* prevBlockId,
@@ -260,7 +224,7 @@ extern "C" {
         inPoetPublicKey - A string representing the encoded PoET public key used
             to verify the wait certificate signature.
     */
-    POET_FUNC poet_err_t Poet_VerifyWaitCertificate(
+    poet_err_t Poet_VerifyWaitCertificate(
         const char* inSerializedWaitCertificate,
         const char* inWaitCertificateSignature,
         const char* inPoetPublicKey

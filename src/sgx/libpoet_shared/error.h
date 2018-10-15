@@ -20,7 +20,7 @@
 #include <string>
 
 #include "sgx_error.h"
-#include "poet.h"
+#include "poet_defs.h"
 
 namespace sawtooth {
     namespace poet {

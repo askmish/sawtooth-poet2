@@ -245,8 +245,8 @@ fn check_consensus(block: Block, service: &mut Poet2Service, validator_id: &Vec<
     }*/
 
     // 7. c-test
-    let block_signer = to_hex_string(Vec::from(block.signer_id.clone()));
-    let validator = to_hex_string(validator_id.to_vec());
+    let block_signer = poet2_util::to_hex_string(Vec::from(block.signer_id.clone()));
+    let validator = poet2_util::to_hex_string(validator_id.to_vec());
     
     if validator == block_signer && validator_is_claiming_too_early( block, service){
         return false;

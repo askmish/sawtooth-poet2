@@ -107,7 +107,7 @@ pub fn initialize_wait_cert(eid: &mut r_sgx_enclave_id_t, duration: &mut u64,
 pub fn finalize_wait_cert(eid: &mut r_sgx_enclave_id_t, 
                           wait_cert_info: &mut r_sgx_wait_certificate_t,
                           prev_wait_cert: &str,
-                          prev_block_id: &str, poet_block_id: &str,
+                          prev_block_id: &str, prev_wait_cert_sig: &str,
                           block_summary: &str, 
                           wait_time: &u64) -> Result<String,String> {
     unsafe {
@@ -115,14 +115,14 @@ pub fn finalize_wait_cert(eid: &mut r_sgx_enclave_id_t,
         let wait_cert_ptr = wait_cert_info  as *mut r_sgx_wait_certificate_t;
         let prev_wait_cert_cstring = CString::new(prev_wait_cert).unwrap();
         let prev_block_id_cstring = CString::new(prev_block_id).unwrap();
-        let poet_block_id_cstring = CString::new(poet_block_id).unwrap();
+        let prev_wait_cert_sig_cstring = CString::new(prev_wait_cert_sig).unwrap();
         let block_summary_cstring = CString::new(block_summary).unwrap();
 
         let wait_cert_final_status = r_finalize_wait_certificate(eid_ptr, 
                                                 wait_cert_ptr, 
                                                 prev_wait_cert_cstring.as_ptr(),
                                                 prev_block_id_cstring.as_ptr(),
-                                                poet_block_id_cstring.as_ptr(),
+                                                prev_wait_cert_sig_cstring.as_ptr(),
                                                 block_summary_cstring.as_ptr(),
                                                 *wait_time);
 

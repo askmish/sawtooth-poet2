@@ -294,8 +294,8 @@ impl Poet2Service {
             
             if( block.block_num > 1){
                 let mut prev_block = previous_block.clone();
-                let (prev_wait_cert, prev_wait_cert_sign) = get_wait_cert_and_signature(&prev_block);
-                if(deser_wait_cert.poet_block_id == prev_wait_cert_sign){
+                let (prev_wait_cert, prev_wait_cert_sig) = get_wait_cert_and_signature(&prev_block);
+                if(deser_wait_cert.prev_wait_cert_sig == prev_wait_cert_sig){
                     wait_cert_verify_status = true;
                 }
             }

@@ -113,11 +113,11 @@ int r_finalize_wait_certificate(r_sgx_enclave_id_t* eid,
                                 r_sgx_wait_certificate_t* wait_cert,
                                 const char* prev_wait_cert,
                                 const char* prev_block_id,
-                                const char* poet_block_id,
+                                const char* prev_wait_cert_sig,
                                 const char* block_summary,
                                 uint64_t wait_time) {
 
-    if (!eid || (prev_block_id == NULL) || (poet_block_id == NULL)
+    if (!eid || (prev_block_id == NULL) || (prev_wait_cert_sig == NULL)
         || (block_summary == NULL)) {
         return -1;
     }
@@ -128,7 +128,7 @@ int r_finalize_wait_certificate(r_sgx_enclave_id_t* eid,
 
     WaitCertificate *wait_certificate = finalize_wait_certificate(prev_wait_cert,
                                                                   prev_block_id, 
-                                                                  poet_block_id,
+                                                                  prev_wait_cert_sig,
                                                                   block_summary,
                                                                   wait_time);                                                                 
     if (wait_certificate == NULL) {

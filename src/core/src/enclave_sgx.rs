@@ -30,7 +30,7 @@ use poet2_util;
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct WaitCertificate {
     pub duration_id : String,
-    pub poet_block_id : String,
+    pub prev_wait_cert_sig : String,
     pub prev_block_id : String,
     pub block_summary : String,
     pub block_number : u64,
@@ -42,7 +42,7 @@ impl Default for WaitCertificate {
     fn default() -> WaitCertificate {
         WaitCertificate {
             duration_id   : String::new(),
-            poet_block_id : String::new(),
+            prev_wait_cert_sig : String::new(),
             prev_block_id : String::new(),
             block_summary : String::new(),
             block_number  : 0_u64, 
@@ -117,8 +117,8 @@ impl EnclaveConfig {
         // initialize wait certificate - to get duration from enclave
         ffi::initialize_wait_cert(&mut eid, &mut duration, 
                                   &in_prev_wait_cert, &in_prev_wait_cert_sig,
-        						&poet2_util::to_hex_string(in_validator_id.to_vec()),
-                                &in_poet_pub_key).unwrap();
+                                  &poet2_util::to_hex_string(in_validator_id.to_vec()),
+                                  &in_poet_pub_key).unwrap();
         
         debug!("duration fetched from enclave = {:x?}", duration);
         
@@ -129,7 +129,7 @@ impl EnclaveConfig {
         eid: r_sgx_enclave_id_t,
         in_wait_cert: String,
         in_prev_block_id : String,
-        in_poet_block_id: String,
+        in_prev_wait_cert_sig: String,
         in_block_summary: String,
         in_wait_time: u64)
         -> (String, String)
@@ -143,15 +143,15 @@ impl EnclaveConfig {
                                         ser_wait_cert_sign: 0 as *mut c_char};
 
     	let ret = ffi::finalize_wait_cert(&mut eid, &mut wait_cert_info,
-                                            &in_wait_cert, &in_prev_block_id,
-                                            &in_poet_block_id,
-                                            &in_block_summary, &in_wait_time);
+                                          &in_wait_cert, &in_prev_block_id,
+                                          &in_prev_wait_cert_sig,
+                                          &in_block_summary, &in_wait_time);
 
         let wait_cert = ffi::create_string_from_char_ptr(
-                            wait_cert_info.ser_wait_cert as *mut c_char);
+                             wait_cert_info.ser_wait_cert as *mut c_char);
         
         let wait_cert_sign = ffi::create_string_from_char_ptr(
-                            wait_cert_info.ser_wait_cert_sign as *mut c_char);
+                             wait_cert_info.ser_wait_cert_sign as *mut c_char);
 
         info!("wait certificate generated is {:?}", wait_cert);
 
@@ -180,3 +180,4 @@ impl EnclaveConfig {
     }
     
 }
+

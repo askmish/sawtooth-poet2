@@ -20,7 +20,7 @@ use serde_json;
 use consensus_state::*;
 use consensus_state_store::ConsensusStateStore;
 use poet2_util;
-use enclave_sim::WaitCertificate;
+use enclave_sgx::WaitCertificate;
 
 pub fn resolve_fork(service: &mut Poet2Service, state_store: &mut ConsensusStateStore,
         block_id: BlockId, prev_wait_time: u64) -> bool {

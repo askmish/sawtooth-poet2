@@ -233,7 +233,7 @@ fn check_consensus(block: Block, service: &mut Poet2Service, validator_id: &Vec<
 
     //\\ 2. Signature validation using sender's PPK
 
-    if !verify_wait_certificate(block, service, &poet_pub_key){
+    if !verify_wait_certificate(block.clone(), service, &poet_pub_key){
         return false;
     }
 

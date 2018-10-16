@@ -72,7 +72,7 @@ bool _verify_wait_certificate(
 WaitCertificate::WaitCertificate(
     const std::string& prevWaitCertificate,
     const std::string& prevBlockId,
-    const std::string& poetBlockId,
+    const std::string& prevWaitCertificateSig,
     const std::string& blockSummary,
     uint64_t waitTime
     )
@@ -86,8 +86,8 @@ WaitCertificate::WaitCertificate(
             prevWaitCertificate.length(),
             prevBlockId.c_str(),
             prevBlockId.length(),
-            poetBlockId.c_str(),
-            poetBlockId.length(),
+            prevWaitCertificateSig.c_str(),
+            prevWaitCertificateSig.length(),
             blockSummary.c_str(),
             blockSummary.length(),
             waitTime,
@@ -134,12 +134,12 @@ poet_err_t WaitCertificate::_InitializeWaitCertificate(
 WaitCertificate* WaitCertificate::_FinalizeWaitCertificate(
     const std::string& prevWaitCertificate,
     const std::string& prevBlockId,
-    const std::string& poetBlockId,
+    const std::string& prevWaitCertificateSig,
     const std::string& blockSummary,
     uint64_t waitTime
     )
 { 
-    return new WaitCertificate(prevWaitCertificate, prevBlockId, poetBlockId, blockSummary, waitTime);
+    return new WaitCertificate(prevWaitCertificate, prevBlockId, prevWaitCertificateSig, blockSummary, waitTime);
 } // WaitCertificate::_FinalizeWaitCertificate
 
 
@@ -159,12 +159,12 @@ poet_err_t initialize_wait_certificate(
 WaitCertificate* finalize_wait_certificate(
     const std::string& prevWaitCertificate,
     const std::string& prevBlockId,
-    const std::string& poetBlockId,
+    const std::string& prevWaitCertificateSig,
     const std::string& blockSummary,
     uint64_t waitTime
     )
 {
-    return WaitCertificate::_FinalizeWaitCertificate(prevWaitCertificate, prevBlockId, poetBlockId, blockSummary, waitTime);
+    return WaitCertificate::_FinalizeWaitCertificate(prevWaitCertificate, prevBlockId, prevWaitCertificateSig, blockSummary, waitTime);
 }
 
 void _destroy_wait_certificate(WaitCertificate *waitCert)
@@ -217,8 +217,8 @@ void WaitCertificate::deserialize(
                 "certificate");
     }
 
-    if (json_object_object_get_ex(jsonObject, "poet_block_id", &jsonValue)) {
-        this->poet_block_id = json_object_get_string(jsonValue);
+    if (json_object_object_get_ex(jsonObject, "prev_wait_cert_sig", &jsonValue)) {
+        this->prev_wait_cert_sig = json_object_get_string(jsonValue);
     } else {
         throw
             ValueError(

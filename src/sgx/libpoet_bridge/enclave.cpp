@@ -481,7 +481,7 @@ namespace sawtooth {
             size_t inPreviousWaitCertificateLen, 
             const char* inValidatorId,
             size_t inValidatorIdLen,
-            const sgx_ec256_signature_t* inprevWaitCertificateSig,
+            const sgx_ec256_signature_t* inPrevWaitCertificateSig,
             const sgx_ec256_public_t* inPoetPublicKey,
             uint8_t* duration,
             size_t inDurationLen
@@ -490,7 +490,7 @@ namespace sawtooth {
     
             ThrowIfNull( inPreviousWaitCertificate, "NULL PreviousWaitCertificate");
             ThrowIfNull( inValidatorId, "NULL ValidatorId");
-            ThrowIfNull( inprevWaitCertificateSig, "NULL PreviousWaitCertificateSig");
+            ThrowIfNull( inPrevWaitCertificateSig, "NULL PreviousWaitCertificateSig");
             ThrowIfNull( inPoetPublicKey, "NULL PoetPublicKey");
 
             poet_err_t poetRet = POET_SUCCESS;
@@ -502,7 +502,7 @@ namespace sawtooth {
                          inPreviousWaitCertificateLen,
                          inValidatorId,
                          inValidatorIdLen, 
-                         inprevWaitCertificateSig,
+                         inPrevWaitCertificateSig,
                          inPoetPublicKey,
                          duration,
                          inDurationLen] () {
@@ -514,7 +514,7 @@ namespace sawtooth {
                                 inPreviousWaitCertificateLen,
                                 inValidatorId, 
                                 inValidatorIdLen,
-                                inprevWaitCertificateSig,
+                                inPrevWaitCertificateSig,
                                 inPoetPublicKey,
                                 duration,
                                 inDurationLen);
@@ -529,8 +529,8 @@ namespace sawtooth {
             size_t inPrevWaitCertificateLen,
             const char* inPrevBlockId,
             size_t inPrevBlockIdLen,
-            const char* inPoetBlockId,
-            size_t inPoetBlockIdLen,
+            const char* inPrevWaitCertificateSig,
+            size_t inPrevWaitCertificateSigLen,
             const char* inBlockSummary,
             size_t inBlockSummaryLen,
             uint64_t inWaitTime,
@@ -541,7 +541,7 @@ namespace sawtooth {
         {
             ThrowIfNull(inPrevWaitCertificate, "NULL PrevWaitCertificate");
             ThrowIfNull(inPrevBlockId, "NULL PreviousBlockId");
-            ThrowIfNull(inPoetBlockId, "NULL PoetBlockId");
+            ThrowIfNull(inPrevWaitCertificateSig, "NULL PrevWaitCertificateSignature");
             ThrowIfNull(inBlockSummary, "NULL BlockSummary");
             ThrowIfNull(outSerializedWaitCertificate, "NULL outSerializedWaitCertificate");
 
@@ -554,8 +554,8 @@ namespace sawtooth {
                          inPrevWaitCertificateLen,
                          inPrevBlockId,
                          inPrevBlockIdLen,
-                         inPoetBlockId,
-                         inPoetBlockIdLen,
+                         inPrevWaitCertificateSig,
+                         inPrevWaitCertificateSigLen,
                          inBlockSummary,
                          inBlockSummaryLen,
                          inWaitTime,
@@ -570,8 +570,8 @@ namespace sawtooth {
                                 inPrevWaitCertificateLen,
                                 inPrevBlockId,
                                 inPrevBlockIdLen,
-                                inPoetBlockId,
-                                inPoetBlockIdLen,
+                                inPrevWaitCertificateSig,
+                                inPrevWaitCertificateSigLen,
                                 inBlockSummary,
                                 inBlockSummaryLen,
                                 inWaitTime,

@@ -438,8 +438,8 @@ poet_err_t ecall_FinalizeWaitCertificate(
     size_t inPreviousWaitCertificateLen,
     const char* inPrevBlockId, 
     size_t inPrevBlockIdLen,
-    const char* inPoetBlockId, 
-    size_t inPoetBlockIdLen,
+    const char* inPrevWaitCertificateSig, 
+    size_t inPrevWaitCertificateSigLen,
     const char* inBlockSummary, 
     size_t inBlockSummaryLen,
     uint64_t inWaitTime,
@@ -461,8 +461,8 @@ poet_err_t ecall_FinalizeWaitCertificate(
                    "Previous BlockId length must be non-zero");
 
         sp::ThrowIfNull(
-            inPoetBlockId,
-            "Poet BlockId is NULL");
+            inPrevWaitCertificateSig,
+            "Previous WaitCertificate Signature is NULL");
        
         sp::ThrowIfNull(
             inBlockSummary,
@@ -496,7 +496,7 @@ poet_err_t ecall_FinalizeWaitCertificate(
         }
         
         gWaitCertData.waitCert.previous_block_id = (char *)inPrevBlockId;
-        gWaitCertData.waitCert.poet_block_id = (char *)inPoetBlockId;
+        gWaitCertData.waitCert.prev_wait_cert_sig = (char *)inPrevWaitCertificateSig;
         gWaitCertData.waitCert.block_summary = (char *)inBlockSummary;
         gWaitCertData.waitCert.wait_time = inWaitTime;
         
@@ -519,8 +519,8 @@ poet_err_t ecall_FinalizeWaitCertificate(
         jret = json_object_dotset_string(waitCertObject, "duration_id", gWaitCertData.waitCert.duration.c_str());
         sp::ThrowIf<sp::RuntimeError>( jret != JSONSuccess, "WaitCertificate serialization failed on Duration.");
 
-        jret = json_object_dotset_string(waitCertObject, "poet_block_id", gWaitCertData.waitCert.poet_block_id.c_str());
-        sp::ThrowIf<sp::RuntimeError>( jret != JSONSuccess, "WaitCertificate serialization failed on PoetBlockId.");
+        jret = json_object_dotset_string(waitCertObject, "prev_wait_cert_sig", gWaitCertData.waitCert.prev_wait_cert_sig.c_str());
+        sp::ThrowIf<sp::RuntimeError>( jret != JSONSuccess, "WaitCertificate serialization failed on Previous wait certificate signautre.");
 
         jret = json_object_dotset_string(waitCertObject, "prev_block_id", gWaitCertData.waitCert.previous_block_id.c_str());
         sp::ThrowIf<sp::RuntimeError>( jret != JSONSuccess, "WaitCertificate serialization failed on PreviousBlockId.");

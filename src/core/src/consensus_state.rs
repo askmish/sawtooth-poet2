@@ -1,6 +1,6 @@
 use sawtooth_sdk::consensus::{engine::*};
 use service::Poet2Service;
-use enclave_sim::WaitCertificate;
+use enclave_sgx::WaitCertificate;
 use std::collections::VecDeque;
 use std::collections::HashMap;
 #[macro_use]

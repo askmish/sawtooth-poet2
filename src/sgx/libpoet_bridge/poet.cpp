@@ -507,8 +507,8 @@ poet_err_t Poet_FinalizeWaitCertificate(
     size_t prevWaitCertificateLen,
     const char* prevBlockId,
     size_t prevBlockIdLen,
-    const char* poetBlockId,
-    size_t poetBlockIdLen,
+    const char* prevWaitCertificateSig,
+    size_t prevWaitCertificateSigLen,
     const char* blockSummary,
     size_t blockSummaryLen,
     uint64_t waitTime,
@@ -523,7 +523,7 @@ poet_err_t Poet_FinalizeWaitCertificate(
         // validate params
         sp::ThrowIfNull(prevWaitCertificate, "NULL PrevWaitCertificate");
         sp::ThrowIfNull(prevBlockId, "NULL PoetBlockId");
-        sp::ThrowIfNull(poetBlockId, "NULL PoetBlockId");
+        sp::ThrowIfNull(prevWaitCertificateSig, "NULL PrevWaitCertificateSignature");
         sp::ThrowIfNull(blockSummary, "NULL BlockSummary");
    
         sgx_ec256_signature_t waitCertificateSignature;
@@ -533,8 +533,8 @@ poet_err_t Poet_FinalizeWaitCertificate(
             prevWaitCertificateLen,
             prevBlockId,
             prevBlockIdLen,
-            poetBlockId,
-            poetBlockIdLen,
+            prevWaitCertificateSig,
+            prevWaitCertificateSigLen,
             blockSummary,
             blockSummaryLen,
             waitTime,

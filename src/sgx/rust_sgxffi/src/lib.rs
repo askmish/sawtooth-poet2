@@ -104,8 +104,8 @@ mod tests {
 
         // finalize wait certificate - to get wait certificate
         let ret = ffi::finalize_wait_cert(&mut eid, &mut wait_cert_info, &prev_cert,
-                                         &prev_block_id, &prev_wait_cert_sig,
-                                         &block_summary, &wait_time).unwrap();
+                                          &prev_block_id, &prev_wait_cert_sig,
+                                          &block_summary, &wait_time).unwrap();
         assert_eq!(ret, "Success");
 
         let wait_cert = ffi::create_string_from_char_ptr(wait_cert_info.ser_wait_cert as *mut c_char);

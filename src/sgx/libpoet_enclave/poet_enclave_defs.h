@@ -27,7 +27,7 @@ typedef struct {
 typedef struct
 {
     std::string duration;
-    std::string poet_block_id;
+    std::string prev_wait_cert_sig;
     std::string previous_block_id;
     std::string block_summary;
     uint64_t block_num;

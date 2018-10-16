@@ -43,7 +43,7 @@ int r_initialize_wait_certificate(r_sgx_enclave_id_t *eid, uint8_t* duration,
 
 int r_finalize_wait_certificate(r_sgx_enclave_id_t *eid, r_sgx_wait_certificate_t *wait_cert,
                                 const char *prev_wait_cert, 
-                                const char *prev_block_id, const char *poet_block_id,
+                                const char *prev_block_id, const char *prev_wait_cert_sig,
                                 const char *block_summary, uint64_t wait_time);
 
 bool r_verify_wait_certificate(r_sgx_enclave_id_t *eid, const char *ppk,

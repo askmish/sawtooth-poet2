@@ -16,8 +16,8 @@ typedef struct r_sgx_signup_info_t {
     char *poet_public_key;
     uint32_t poet_public_key_len;
     char *enclave_quote;
-    //char *proof_data;
-    //char *anti_sybil_id;
+    char *proof_data;
+    char *anti_sybil_id;
 }r_sgx_signup_info_t;
 
 typedef struct r_sgx_wait_certificate_t {

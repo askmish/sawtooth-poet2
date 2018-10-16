@@ -102,7 +102,9 @@ mod tests {
                                              = r_sgx_signup_info_t {handle:0,
                                                        poet_public_key : 0 as *mut c_char,
                                                        poet_public_key_len : 0,
-                                                       enclave_quote : 0 as *mut c_char };
+                                                       enclave_quote : 0 as *mut c_char,
+                                                       anti_sybil_id: 0 as *mut c_char,
+                                                       proof_data: 0 as *mut c_char,};
 
         println!("creating signup_info");
         let ret = ffi::create_signup_info(&mut eid, &opk_hash_vec, &mut signup_info).unwrap();

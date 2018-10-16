@@ -60,6 +60,15 @@ struct ReadResponse {
 
 /// Implement how the IasClient is going to be used
 impl IasClient {
+    /// default constructor for IasClient, remember to use setters later
+    pub fn default() -> Self {
+        IasClient {
+            ias_url: String::new(),
+            spid_cert_file: [].to_vec(),
+            timeout: Duration::new(300, 0),
+        }
+    }
+
     /// constructor for IasClient
     pub fn new(url: String, cert_file: Vec<u8>, time: Option<u64>) -> Self {
         IasClient {
@@ -70,6 +79,18 @@ impl IasClient {
             // timeout in seconds
             timeout: Duration::new(time.unwrap_or(300), 0),
         }
+    }
+
+    pub fn ias_url_mut(&mut self) -> &mut String {
+        &mut self.ias_url
+    }
+
+    pub fn spid_cert_file_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.spid_cert_file
+    }
+
+    pub fn timeout_mut(&mut self) -> &mut Duration {
+        &mut self.timeout
     }
 
     /// Get signature revocation list from Intel Attestation Server

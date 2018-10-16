@@ -36,13 +36,21 @@ use poet2_util;
 use sawtooth_sdk::consensus::{engine::*, service::Service};
 use service::Poet2Service;
 use settings_view::Poet2SettingsView;
+use TomlConfig;
+use registration::do_register;
+
+const DEFAULT_BLOCK_CLAIM_LIMIT:i32 = 250;
+const MAXIMUM_NONCE_LENGTH:usize = 32;
 
 pub struct Poet2Engine {
+    config: TomlConfig,
 }
 
 impl Poet2Engine {
-    pub fn new() -> Self {
-        Poet2Engine {}
+    pub fn new(config: TomlConfig) -> Self {
+        Poet2Engine {
+            config
+        }
     }
 }
 
@@ -68,8 +76,15 @@ impl Engine for Poet2Engine {
 
         let mut start = Instant::now();
 
-        service.enclave.initialize_enclave();
-        service.enclave.create_signup_info(&validator_id);
+        // TODO: Check if all expected fields are present in config
+        service.enclave.initialize_enclave(self.config.clone());
+        service.enclave.initialize_remote_attestation(self.config.clone());
+        let block_id = service.get_chain_head().block_id;
+        let nonce = from_utf8(block_id.clone().as_ref()).unwrap()[MAXIMUM_NONCE_LENGTH..].to_string();
+
+        let signup_info = service.enclave.create_signup_info(&validator_id, nonce);
+        // Use genesis block ID and read signer key from default location
+        do_register("".to_string(), block_id.as_ref(), signup_info);
 
         let (poet_pub_key, enclave_quote) = service.enclave.get_signup_parameters();
 

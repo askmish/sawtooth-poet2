@@ -17,6 +17,7 @@
 #[macro_use]
 extern crate clap;
 extern crate serde;
+#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
@@ -36,6 +37,7 @@ extern crate sgxffi;
 extern crate hyper;
 extern crate ias_client;
 extern crate tokio_core;
+extern crate toml;
 
 pub mod engine;
 pub mod service;
@@ -48,6 +50,7 @@ pub mod settings_view;
 pub mod fork_resolver;
 pub mod check_consensus;
 pub mod registration;
+pub mod validator_proto;
 
 use engine::Poet2Engine;
 use sawtooth_sdk::consensus::{zmq_driver::ZmqDriver};
@@ -58,6 +61,15 @@ use log4rs::append::file::FileAppender;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Config, Root, Logger};
 use log4rs::encode::pattern::PatternEncoder;
+use std::fs::File;
+use std::io::Read;
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TomlConfig {
+    spid: String,
+    ias_url: String,
+    spid_cert_file: String,
+}
 
 /*
  *
@@ -77,6 +89,8 @@ fn main() {
     let matches = clap_app!(sawtooth_poet2 =>
         (version: crate_version!())
         (about: "PoET 2 Consensus Engine")
+        (@arg config: --config +takes_value
+        "toml config file for IAS connection")
         (@arg connect: -C --connect +takes_value
          "connection endpoint url for validator")
         (@arg verbose: -v --verbose +multiple
@@ -125,6 +139,26 @@ fn main() {
         error!("{}", err);
         process::exit(1);
     });
+
+    // read configuration file, i.e. TOML confiuration file
+    let config_file = match matches.value_of("config") {
+        Some(config_present) => config_present,
+        None => panic!("Config file is not input, use -h for information"),
+    };
+    let mut file_reader = match File::open(config_file) {
+        Ok(file_present) => file_present,
+        Err(err) => panic!("Config file is not present: {}", err),
+    };
+    let mut file_contents = String::new();
+    match file_reader.read_to_string(&mut file_contents) {
+        Err(err) => panic!("Unable to read config file: {}", err),
+        Ok(_something) => (),
+    };
+    info!("Read file contents: {}", file_contents);
+    let config: TomlConfig = match toml::from_str(file_contents.as_str()) {
+        Ok(config_read) => config_read,
+        Err(err) => panic!("Error converting config file: {}", err),
+    };
 
     let (driver, _stop_handle) = ZmqDriver::new();
     info!("Starting the ZMQ Driver.");

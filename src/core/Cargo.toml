@@ -39,6 +39,7 @@ rust_sgxffi = { path = "../sgx/rust_sgxffi"}
 hyper = "0.12.11"
 ias_client = { path = "../ias_client" }
 tokio-core = "0.1.17"
+toml = "0.4.8"
 
 [package.metadata.deb]
 assets = [

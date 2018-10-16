@@ -17,13 +17,15 @@
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
-use poet2_util::{read_file_as_string, sha256_from_str, sha512_from_str, send_to_rest_api};
+use poet2_util::{read_file_as_string, send_to_rest_api, sha256_from_str, sha512_from_str, to_hex_string};
 use protobuf::{Message, RepeatedField};
 use sawtooth_sdk::messages::batch::{Batch, BatchHeader, BatchList};
 use sawtooth_sdk::messages::transaction::{Transaction, TransactionHeader};
 use sawtooth_sdk::signing::{create_context, PrivateKey, PublicKey, Signer};
 use sawtooth_sdk::signing::secp256k1::Secp256k1PrivateKey;
+use serde_json;
 use std::str::from_utf8;
+use validator_proto::{SignupInfo, ValidatorRegistryPayload};
 
 static MAXIMUM_NONCE_SIZE: usize = 32;
 static VALIDATOR_REGISTRY: &str = "validator_registry";
@@ -32,10 +34,11 @@ static VALIDATOR_MAP: &str = "validator_map";
 static NAMESPACE_ADDRESS_LENGTH: usize = 6;
 static SETTINGS_PART_LENGTH: usize = 16;
 static CONFIGSPACE_NAMESPACE: &str = "000000";
+static PUBLIC_KEY_IDENTIFIER_LENGTH: usize = 8;
 
 /// This utility generates a validator registry transaction and sends it.
 /// In other words acts as client for validator registry TP.
-fn do_create_registration(signer_key: String, block_id: &[u8]) -> String {
+pub fn do_register(signer_key: String, block_id: &[u8], signup_info: SignupInfo) -> String {
 
     // Default path: /etc/sawtooth/keys/validator.priv
     let read_key = if signer_key.is_empty() {
@@ -64,8 +67,12 @@ fn do_create_registration(signer_key: String, block_id: &[u8]) -> String {
     let public_key_hash = sha256_from_str(public_key.as_hex().as_ref());
     // nonce from SignupInfo block id
     let nonce = from_utf8(&block_id[..MAXIMUM_NONCE_SIZE]).unwrap().to_string();
-    // Payload for the TP
-    let payload = "random payload data";
+    // TODO: Get the payload and send it
+    let verb = "register".to_string();
+    let name = "validator-".to_owned() + &public_key.as_hex()[..PUBLIC_KEY_IDENTIFIER_LENGTH];
+    let id = public_key.as_hex();
+    let raw_payload = ValidatorRegistryPayload::new(verb, name, id, signup_info);
+    let payload = serde_json::to_string(&raw_payload).unwrap().into_bytes();
 
     // Namespace for the TP
     let vr_namespace = sha256_from_str(VALIDATOR_REGISTRY)[..NAMESPACE_ADDRESS_LENGTH]
@@ -80,7 +87,6 @@ fn do_create_registration(signer_key: String, block_id: &[u8]) -> String {
 
     // Output address for the transaction
     let output_addresses = [vr_entry_address.clone(), vr_map_address.clone()];
-    // TODO: Change these settings
     let input_addresses = [vr_entry_address, vr_map_address,
         get_address_for_setting("sawtooth.poet2.report_public_key_pem"),
         get_address_for_setting("sawtooth.poet2.valid_enclave_measurements"),
@@ -89,13 +95,13 @@ fn do_create_registration(signer_key: String, block_id: &[u8]) -> String {
     // Create transaction header, transaction, batch header, batch and batch list
     let transaction_header = get_transaction_header(&input_addresses,
                                                     &output_addresses,
-                                                    payload.to_string(),
+                                                    to_hex_string(payload.clone()),
                                                     public_key,
                                                     nonce);
     let transaction_header_bytes = transaction_header.write_to_bytes().unwrap();
     let transaction_signature = signer.sign(&transaction_header_bytes.to_vec()).unwrap();
     let transaction = get_transaction(&transaction_header_bytes, transaction_signature,
-                                      String::from(payload));
+                                      to_hex_string(payload));
     let batch = get_batch(signer, transaction);
     let batch_list = get_batch_list(batch);
     // call the API with bytes to be sent

@@ -187,7 +187,6 @@ impl EnclaveConfig {
         let mut eid:r_sgx_enclave_id_t = self.enclave_id;
         let mut epid_info:r_sgx_epid_group_t = r_sgx_epid_group_t {epid : 0 as *mut c_char};
         let ret = ffi::get_epid_group(&mut eid, &mut epid_info).unwrap();
-
         let epid = ffi::create_string_from_char_ptr(epid_info.epid);
         debug!("EPID group = {:?}", epid);
         epid

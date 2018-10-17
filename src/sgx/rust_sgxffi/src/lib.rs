@@ -26,6 +26,7 @@ mod tests {
     use ffi::r_sgx_enclave_id_t;
     use ffi::r_sgx_signup_info_t;       
     use ffi::r_sgx_wait_certificate_t;
+    use ffi::r_sgx_epid_group_t;
 
     #[test]
     fn it_works() {
@@ -35,7 +36,10 @@ mod tests {
     //#[test]
     fn init_free_enclave_test() {
         
-        let mut eid:r_sgx_enclave_id_t = r_sgx_enclave_id_t {handle : 0};
+        let mut eid:r_sgx_enclave_id_t = r_sgx_enclave_id_t {handle : 0,
+                                                             mr_enclave:0 as *mut c_char,
+                                                             basename:0 as *mut c_char};
+
         
         //spid should be a valid UTF-8 string of length 32. create all AAAAA's
         let spid_vec = vec![0x41; 32]; 
@@ -55,7 +59,9 @@ mod tests {
     #[test]
     fn create_wait_certificate_test(){
         println!("create_wait_certificate test");
-        let mut eid:r_sgx_enclave_id_t = r_sgx_enclave_id_t {handle : 0};
+        let mut eid:r_sgx_enclave_id_t = r_sgx_enclave_id_t {handle : 0,
+                                                             mr_enclave:0 as *mut c_char,
+                                                             basename:0 as *mut c_char};
 
         //spid should be a valid UTF-8 string of length 32. create all AAAAA's
         let spid_vec = vec![0x41; 32];
@@ -67,11 +73,30 @@ mod tests {
         let ret = ffi::init_enclave(&mut eid, bin_path, spid_str).unwrap();
         assert_eq!(ret, "Success");
 
+        //Enclave Parameters for IAS operations
+        let mr_enclave = ffi::create_string_from_char_ptr(eid.mr_enclave as *mut c_char);
+        let enclave_basename = ffi::create_string_from_char_ptr(eid.basename as *mut c_char);
+        println!("enclave basename = {:?}", mr_enclave);
+        println!("enclave measurement = {:?}", enclave_basename);
+
+        let mut epid_info:r_sgx_epid_group_t = r_sgx_epid_group_t { epid: 0 as *mut c_char};
+        let ret = ffi::get_epid_group(&mut eid, &mut epid_info).unwrap();
+
+        assert_eq!(ret, "Success");
+
+        let epid = ffi::create_string_from_char_ptr(epid_info.epid);
+        println!("EPID group = {:?}", epid);
+
+        //check if SGX is running in simulator mode
+        let is_simulator = ffi::is_sgx_simulator(&mut eid);
+        println!("is_sgx_simulator ? {:?}", is_sgx_simulator);
+
         let opk_hash_vec = "ABCD" ;
         let mut signup_info:r_sgx_signup_info_t
                                              = r_sgx_signup_info_t {handle:0,
                                                        poet_public_key : 0 as *mut c_char,
-                                                       poet_public_key_len : 0 };
+                                                       poet_public_key_len : 0,
+                                                       enclave_quote : 0 as *mut c_char };
 
         println!("creating signup_info");
         let ret = ffi::create_signup_info(&mut eid, &opk_hash_vec, &mut signup_info).unwrap();
@@ -79,6 +104,9 @@ mod tests {
 
         let ppk_str: String = ffi::create_string_from_char_ptr(signup_info.poet_public_key as *mut c_char);
         println!("Poet Public Key : {}", ppk_str);
+
+        let quote: String = ffi::create_string_from_char_ptr(signup_info.enclave_quote as *mut c_char);
+        println!("Enclave quote : {}", quote);
 
         let mut duration: u64 = 0x0102030405060708;
         let mut prev_cert = "";

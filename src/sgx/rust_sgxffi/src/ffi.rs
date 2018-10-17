@@ -35,7 +35,7 @@ pub fn init_enclave(eid: &mut r_sgx_enclave_id_t, signed_enclave: &str,
         let enclave_init_status = r_initialize_enclave(eid_ptr,
                                                     enclave_cstring.as_ptr(),
                                                     spid_cstring.as_ptr());
-
+        
         match enclave_init_status {
             0 => Ok("Success".to_string()),
             _ => Err("Enclave initialization failed".to_string()),
@@ -53,6 +53,27 @@ pub fn free_enclave(eid: &mut r_sgx_enclave_id_t) -> Result<String,String> {
             _ => Err("Enclave free failed".to_string()),
         }
     }    
+}
+
+pub fn get_epid_group(eid: &mut r_sgx_enclave_id_t,
+                                   epid_group: &mut r_sgx_epid_group_t) -> Result<String,String>{
+    unsafe {
+        let eid_ptr = eid as *mut r_sgx_enclave_id_t;
+        let epid_group_ptr = epid_group as *mut r_sgx_epid_group_t;
+        let epid_status = r_get_epid_group(eid_ptr, epid_group_ptr);
+        match epid_status {
+             0 => Ok("Success".to_string()),
+             _ => Err("Get EPID group failed".to_string()),
+        }
+    }
+}
+
+pub fn is_sgx_simulator(eid: &mut r_sgx_enclave_id_t) -> bool {
+    unsafe {
+        let eid_ptr = eid as *mut r_sgx_enclave_id_t;
+        let is_simulator = r_is_sgx_simulator(eid_ptr);
+        is_simulator
+    }
 }
 
 pub fn create_signup_info(eid: &mut r_sgx_enclave_id_t, opk_hash: &str, 

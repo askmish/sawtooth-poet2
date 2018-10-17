@@ -20,7 +20,6 @@
 #include <string.h>
 #include <vector>
 #include <string>
-#include "poet.h"
 #include "error.h"
 #include "base64.h"
 

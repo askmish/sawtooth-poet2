@@ -32,6 +32,7 @@
 
 #include "zero.h"
 #include "public_key_util.h"
+#include "signature_util.h"
 
 #define CERTIFICATE_ID_LENGTH 16
 #define MAX_ADDRESS_LENGTH 66
@@ -56,16 +57,6 @@ static void Poet_SetLastError(
     const char* msg
     );
 
-static void Poet_EncodeSignature(
-    char* outEncodedSignature,
-    size_t inEncodedSignatureLength,
-    const sgx_ec256_signature_t* inSignature
-    );
-
-static void Poet_DecodeSignature(
-    sgx_ec256_signature_t *outSignature,
-    const char* inEncodedSignature
-    );
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 // XX External interface                                             XX
@@ -473,7 +464,7 @@ poet_err_t Poet_InitializeWaitCertificate(
         // Take the encoded wait certificate signature and PoET public keys and
         // convert them into something that is more convenient to use internally
         if (strnlen(prevWaitCertificateSig, prevWaitCertificateSigLen) > 0) {
-            Poet_DecodeSignature(&waitCertificateSignature, prevWaitCertificateSig);
+            sp::Poet_DecodeSignature(&waitCertificateSignature, prevWaitCertificateSig);
         } 
         
         sp::DecodePublicKey(&decodedPoetPublicKey, poetPubKey);
@@ -544,7 +535,7 @@ poet_err_t Poet_FinalizeWaitCertificate(
             );
 
         // Encode the certificate signature returned
-        Poet_EncodeSignature(
+        sp::Poet_EncodeSignature(
             serializedWaitCertificateSignature,
             serializedWaitCertificateSignatureLen,
             &waitCertificateSignature);
@@ -587,7 +578,7 @@ poet_err_t Poet_VerifyWaitCertificate(
 
         // Take the encoded wait certificate signature and PoET public keys and
         // convert them into something that is more convenient to use internally
-        Poet_DecodeSignature(
+        sp::Poet_DecodeSignature(
             &waitCertificateSignature,
             inWaitCertificateSignature);
         sp::DecodePublicKey(&poetPublicKey, inPoetPublicKey);
@@ -626,85 +617,3 @@ void Poet_SetLastError(
         g_LastError = "No error description";
     }
 } // Poet_SetLastError
-
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-void Poet_EncodeSignature(
-    char* outEncodedSignature,
-    size_t inEncodedSignatureLength,
-    const sgx_ec256_signature_t* inSignature
-    )
-{
-    // NOTE - NOTE - NOTE - NOTE - NOTE - NOTE - NOTE - NOTE
-    //
-    // Before converting the signature to a base 64 string we are going to
-    // reverse the signature x and y components as it appears that these large
-    // integers seem (I say seem as I don't have access to source code) to be
-    // stored in the arrays in little endian.  Therefore, we are going to
-    // reverse them so that they are in big endian.
-    //
-    // NOTE - NOTE - NOTE - NOTE - NOTE - NOTE - NOTE - NOTE
-
-    // We know that the buffer will be no bigger than
-    // sizeof(*inSignature) because of potential padding
-    std::vector<uint8_t> bigEndianBuffer;
-    bigEndianBuffer.reserve(sizeof(*inSignature));
-
-    // Copy the x and y components of the public key into the the buffer,
-    // reversing the order of bytes as we do so.
-    std::copy(
-        std::reverse_iterator<const uint8_t *>(
-            reinterpret_cast<const uint8_t *>(inSignature->x) +
-            sizeof(inSignature->x)),
-        std::reverse_iterator<const uint8_t *>(
-            reinterpret_cast<const uint8_t *>(inSignature->x)),
-        std::back_inserter(bigEndianBuffer));
-    std::copy(
-        std::reverse_iterator<const uint8_t *>(
-            reinterpret_cast<const uint8_t *>(inSignature->y) +
-            sizeof(inSignature->y)),
-        std::reverse_iterator<const uint8_t *>(
-            reinterpret_cast<const uint8_t *>(inSignature->y)),
-        std::back_inserter(bigEndianBuffer));
-
-    // Now convert the signature components to base 64 into the caller's buffer
-    sp::EncodeB64(
-        outEncodedSignature,
-        inEncodedSignatureLength,
-        bigEndianBuffer);
-} // Poet_EncodeSignature
-
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-void Poet_DecodeSignature(
-    sgx_ec256_signature_t *outSignature,
-    const char* inEncodedSignature
-    )
-{
-    // First convert the base 64 string to a buffer of bytes
-    std::vector<uint8_t> bigEndianBuffer;
-    sp::DecodeB64(bigEndianBuffer, inEncodedSignature);
-
-    // NOTE - NOTE - NOTE - NOTE - NOTE - NOTE - NOTE - NOTE
-    //
-    // After converting the base 64 string to a signature we are going to
-    // reverse the signature x and y components as it appears that these large
-    // integers seem (I say seem as I don't have access to source code) to be
-    // stored in the arrays in little endian.  Therefore, we are going to
-    // reverse them from the big endian format we used when we encoded it.
-    //
-    // NOTE - NOTE - NOTE - NOTE - NOTE - NOTE - NOTE - NOTE
-
-    // Copy the contents of the buffer into the x and y components of
-    // the signature, reversing the order of the bytes as we do so.
-    std::copy(
-        std::reverse_iterator<uint8_t *>(
-            &bigEndianBuffer[0] + sizeof(outSignature->x)),
-        std::reverse_iterator<uint8_t *>(&bigEndianBuffer[0]),
-        reinterpret_cast<uint8_t *>(outSignature->x));
-    std::copy(
-        std::reverse_iterator<uint8_t *>(
-            &bigEndianBuffer[sizeof(outSignature->x)] +
-            sizeof(outSignature->y)),
-        std::reverse_iterator<uint8_t *>(
-            &bigEndianBuffer[sizeof(outSignature->x)]),
-        reinterpret_cast<uint8_t *>(outSignature->y));
-} // Poet_DecodeSignature

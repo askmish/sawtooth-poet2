@@ -90,7 +90,7 @@ pub fn set_sig_revocation_list(eid: &mut r_sgx_enclave_id_t,
     }
 }
 
-pub fn create_signup_info(eid: &mut r_sgx_enclave_id_t, opk_hash: &str, 
+pub fn create_signup_info(eid: &mut r_sgx_enclave_id_t, opk_hash: &str,
                     signup_info: &mut r_sgx_signup_info_t) -> Result<String,String> {
     unsafe {
         let eid_ptr = eid as *mut r_sgx_enclave_id_t;

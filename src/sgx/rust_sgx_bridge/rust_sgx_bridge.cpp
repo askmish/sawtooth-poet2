@@ -26,6 +26,7 @@
 #include "error.h"
 #include <iostream>
 #include "poet.h"
+#include "common.h"
 
 #define DURATION_LENGTH_BYTES 8 //Duration to return is 64 bits (8 bytes)
 
@@ -45,6 +46,8 @@ int r_initialize_enclave(r_sgx_enclave_id_t *eid, const char * enclave_path,
         Poet *poet_enclave_id = Poet::getInstance(enclave_path, spid);
         //store the enclave id
         eid->handle = (intptr_t)poet_enclave_id;
+        eid->mr_enclave = (char *)poet_enclave_id->mr_enclave.c_str();
+        eid->basename = (char *)poet_enclave_id->basename.c_str();
     } catch( sawtooth::poet::PoetError& e) {   
         return -1;
     }
@@ -60,6 +63,31 @@ int r_free_enclave(r_sgx_enclave_id_t *eid)
     }
 
     return 0;
+}
+
+int r_get_epid_group(r_sgx_enclave_id_t *eid, r_sgx_epid_group_t *epid_group) {
+    if (!eid) {
+        return -1;
+    }
+    if(eid->handle == 0) {
+        return -1;
+    }
+    StringBuffer epidBuffer(Poet_GetEpidGroupSize());
+    poet_err_t ret = Poet_GetEpidGroup(epidBuffer.data(), epidBuffer.length);
+    epid_group->epid = epidBuffer.data();
+    printf("\nepid_group in bridge = %s\n", epid_group->epid);
+    return ret;
+ }
+
+bool r_is_sgx_simulator(r_sgx_enclave_id_t *eid) {
+    if (!eid) {
+        return -1;
+    }
+    if(eid->handle == 0) {
+        return -1;
+    }
+    bool is_simulator = _is_sgx_simulator();
+    return is_simulator;
 }
 
 int r_create_signup_info(r_sgx_enclave_id_t *eid, const char *opk_hash, 
@@ -84,6 +112,7 @@ int r_create_signup_info(r_sgx_enclave_id_t *eid, const char *opk_hash,
       return -1;
     }
     signup_info->poet_public_key = (char *)signup_data->poet_public_key.c_str();
+    signup_info->enclave_quote = (char *)signup_data->enclave_quote.c_str();
 
     return 0;   
 }

@@ -72,8 +72,9 @@ impl Engine for Poet2Engine {
         service.enclave.initialize_enclave();
         service.enclave.create_signup_info(&validator_id);
 
-        let signup_data = service.enclave.signup_info;
-        let poet_pub_key = service.enclave.get_poet_pub_key(signup_data);
+        let (poet_pub_key, enclave_quote) = service.enclave.get_signup_parameters();
+
+        info!("Signup info parameters : poet_pub_key = {}, enclave_quote = {}", poet_pub_key, enclave_quote);
 
         let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id, &poet_pub_key));
         let mut prev_wait_time = 0;

@@ -19,6 +19,7 @@ use sgxffi::ffi;
 use sgxffi::ffi::r_sgx_enclave_id_t;
 use sgxffi::ffi::r_sgx_signup_info_t;       
 use sgxffi::ffi::r_sgx_wait_certificate_t;
+use sgxffi::ffi::r_sgx_epid_group_t;
 use std::env;
 use std::os::raw::c_char;
 use std::str;
@@ -59,10 +60,13 @@ pub struct EnclaveConfig {
 
 impl EnclaveConfig {
     pub fn default() -> Self {
-        let eid = r_sgx_enclave_id_t { handle : 0};
+        let eid = r_sgx_enclave_id_t { handle : 0,
+                                       mr_enclave:0 as *mut c_char,
+                                       basename:0 as *mut c_char};
         let signup_info = r_sgx_signup_info_t { handle: 0,
                           poet_public_key : 0 as *mut c_char, 
-                          poet_public_key_len : 0 };
+                          poet_public_key_len : 0,
+                          enclave_quote : 0 as *mut c_char}; //Used for IAS operations
 
         EnclaveConfig {
             enclave_id : eid,
@@ -72,7 +76,9 @@ impl EnclaveConfig {
 
     pub fn initialize_enclave(&mut self)
     {
-    	let mut eid:r_sgx_enclave_id_t = r_sgx_enclave_id_t { handle: 0};
+    	let mut eid:r_sgx_enclave_id_t = r_sgx_enclave_id_t { handle: 0,
+                                                              mr_enclave:0 as *mut c_char,
+                                                              basename:0 as *mut c_char};
 
         //SPID needs to be read from config file
     	let spid_vec = vec![0x41; 32]; 
@@ -86,6 +92,8 @@ impl EnclaveConfig {
         info!("Initialized enclave");
 
     	self.enclave_id.handle = eid.handle;
+        self.enclave_id.basename = eid.basename;
+        self.enclave_id.mr_enclave = eid.mr_enclave;
     }
 
     pub fn create_signup_info(&mut self, pub_key_hash: &Vec<u8>)
@@ -101,6 +109,7 @@ impl EnclaveConfig {
         self.signup_info.handle = signup.handle;
         self.signup_info.poet_public_key = signup.poet_public_key;
         self.signup_info.poet_public_key_len = signup.poet_public_key_len;
+        self.signup_info.enclave_quote = signup.enclave_quote;
     }
 
     pub fn initialize_wait_certificate(
@@ -174,9 +183,28 @@ impl EnclaveConfig {
         ret
     }
 
-    pub fn get_poet_pub_key(&mut self, signup_data: r_sgx_signup_info_t) ->String {
+    pub fn get_epid_group(&mut self) ->String {
+        let mut eid:r_sgx_enclave_id_t = self.enclave_id;
+        let mut epid_info:r_sgx_epid_group_t = r_sgx_epid_group_t {epid : 0 as *mut c_char};
+        let ret = ffi::get_epid_group(&mut eid, &mut epid_info).unwrap();
+
+        let epid = ffi::create_string_from_char_ptr(epid_info.epid);
+        debug!("EPID group = {:?}", epid);
+        epid
+    }
+
+    pub fn check_if_sgx_simulator(&mut self) -> bool {
+        let mut eid:r_sgx_enclave_id_t = self.enclave_id;
+        let is_sgx_simulator = ffi::is_sgx_simulator(&mut eid);
+        println!("is_sgx_simulator ? {:?}", is_sgx_simulator);
+        is_sgx_simulator
+    }
+
+    pub fn get_signup_parameters(&mut self) ->(String, String) {
+        let mut signup_data:r_sgx_signup_info_t = self.signup_info;
         let poet_pub_key = ffi::create_string_from_char_ptr(signup_data.poet_public_key as *mut c_char);
-        poet_pub_key
+        let enclave_quote = ffi::create_string_from_char_ptr(signup_data.enclave_quote as *mut c_char);
+        (poet_pub_key, enclave_quote)
     }
     
 }

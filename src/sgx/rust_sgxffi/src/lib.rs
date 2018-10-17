@@ -89,7 +89,7 @@ mod tests {
 
         //check if SGX is running in simulator mode
         let is_simulator = ffi::is_sgx_simulator(&mut eid);
-        println!("is_sgx_simulator ? {:?}", is_sgx_simulator);
+        println!("is_sgx_simulator ? {:?}", is_simulator);
 
         let opk_hash_vec = "ABCD" ;
         let mut signup_info:r_sgx_signup_info_t

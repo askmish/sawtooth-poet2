@@ -28,7 +28,7 @@ Ren� Nyffenegger rene.nyffenegger@adp-gmbh.ch
 // Notice: This version has been modified from the original
 
 #include "base64.h"
-#include <iostream>
+#include <ctype.h>
 
 static const std::string base64_chars =
 "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

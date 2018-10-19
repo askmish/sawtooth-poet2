@@ -21,13 +21,13 @@ use std::time;
 use std::time::Instant;
 use poet2_util;
 use std::collections::HashMap;
-use enclave_sgx as enclave;
+// use enclave_sgx as enclave;
 use enclave_sgx::*;
-use sgxffi::ffi::r_sgx_enclave_id_t;
-use sgxffi::ffi::r_sgx_signup_info_t;       
-use sgxffi::ffi::r_sgx_wait_certificate_t;
+// use sgxffi::ffi::r_sgx_enclave_id_t;
+// use sgxffi::ffi::r_sgx_signup_info_t;       
+// use sgxffi::ffi::r_sgx_wait_certificate_t;
 
-const DEFAULT_WAIT_TIME: u64 = 0;
+// const DEFAULT_WAIT_TIME: u64 = 0;
 
 pub struct Poet2Service {
     service: Box<Service>,
@@ -73,7 +73,9 @@ impl Poet2Service {
         match blocks {
             Err(err) => {
                 warn!("Could not get a block with id {:?}", block_id.clone());
-                Err(Error::UnknownBlock(format!("Block not found for id {:?}", block_id.clone())))
+                Err(Error::UnknownBlock(format!
+                            ("Block not found for id {:?} error code {:?}", 
+                            block_id.clone(), err)))
             }
             Ok(mut block_map) => {
                 //remove from the returned hashmap to get value
@@ -179,7 +181,7 @@ impl Poet2Service {
 
     pub fn get_wait_time(&mut self, chain_head: Block, validator_id: &Vec<u8>) -> u64
     {
-        let mut duration64: u64 = 0_u64;
+        // let mut duration64: u64 = 0_u64;
         let mut prev_wait_certificate = String::new();
         let mut prev_wait_certificate_sig = String::new();
 
@@ -191,7 +193,7 @@ impl Poet2Service {
             prev_wait_certificate_sig = result.1;
         }
 
-        duration64 = EnclaveConfig::initialize_wait_certificate(
+        let duration64 = EnclaveConfig::initialize_wait_certificate(
                               self.enclave.enclave_id,
                               prev_wait_certificate,
                               poet2_util::blockid_to_hex_string(chain_head.previous_id),
@@ -240,18 +242,17 @@ impl Poet2Service {
     }
 
     pub fn create_consensus(&mut self, summary: Vec<u8>, chain_head: Block, wait_time : u64) -> String {
-        let mut prev_wait_certificate_sig = String::new();
+        // let prev_wait_certificate_sig = String::new();
 
         if chain_head.block_num != 0_u64 { // not genesis block
-            prev_wait_certificate_sig =
-                poet2_util::payload_to_wc_and_sig(chain_head.payload.clone()).1;
+            poet2_util::payload_to_wc_and_sig(chain_head.payload.clone()).1;
         }
          info!("Block id returned is {:?}", Vec::from(chain_head.block_id.clone()));
          let (serial_cert, cert_signature) = EnclaveConfig::finalize_wait_certificate(
                  self.enclave.enclave_id,
-                 self.enclave.signup_info,
+                 // self.enclave.signup_info,
                  poet2_util::blockid_to_hex_string(chain_head.previous_id),
-                 prev_wait_certificate_sig, 
+                 // prev_wait_certificate_sig, 
                  poet2_util::to_hex_string(summary),
                  wait_time
              );

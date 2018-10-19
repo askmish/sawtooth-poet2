@@ -17,13 +17,13 @@
 
 use sgxffi::ffi;
 use sgxffi::ffi::r_sgx_enclave_id_t;
-use sgxffi::ffi::r_sgx_signup_info_t;       
+use sgxffi::ffi::r_sgx_signup_info_t;
 use sgxffi::ffi::r_sgx_wait_certificate_t;
 use std::env;
 use std::os::raw::c_char;
 use std::str;
 use std::vec::Vec;
-use num::ToPrimitive;
+// use num::ToPrimitive;
 use std::string::String;
 use poet2_util;
 
@@ -128,9 +128,9 @@ impl EnclaveConfig {
 
     pub fn finalize_wait_certificate(
         eid: r_sgx_enclave_id_t,
-        signup_data: r_sgx_signup_info_t,
+        // signup_data: r_sgx_signup_info_t,
         in_prev_block_id : String,
-        in_poet_block_id: String,
+        // in_poet_block_id: String,
         in_block_summary: String,
         in_wait_time: u64)
         -> (String, String)
@@ -143,9 +143,10 @@ impl EnclaveConfig {
                                         ser_wait_cert: 0 as *mut c_char,
                                         ser_wait_cert_sign: 0 as *mut c_char};
 
-    	let ret = ffi::finalize_wait_cert(&mut eid, &mut wait_cert_info, 
+    	ffi::finalize_wait_cert(&mut eid, &mut wait_cert_info, 
                                             &in_prev_block_id,
-                                            &in_block_summary, &in_wait_time);
+                                            &in_block_summary, &in_wait_time)
+                                 .expect("failed to finalize wait certificate");
 
         let wait_cert = ffi::create_string_from_char_ptr(
                             wait_cert_info.ser_wait_cert as *mut c_char);
@@ -156,7 +157,8 @@ impl EnclaveConfig {
         info!("wait certificate generated is {:?}", wait_cert);
 
         //release wait certificate
-        let status = ffi::release_wait_certificate(&mut eid, &mut wait_cert_info);
+        ffi::release_wait_certificate(&mut eid, &mut wait_cert_info)
+                            .expect("failed to release wait certificate");
 
     	(wait_cert, wait_cert_sign)
     }

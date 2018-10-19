@@ -22,24 +22,25 @@ extern crate log4rs;
 use sawtooth_sdk::consensus::{engine::*, service::Service};
 use service::Poet2Service;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
-use std::time;
+// use std::time;
 use std::str::FromStr;
 use std::cmp;
-use serde_json;
+// use serde_json;
 use std::time::Duration;
 use std::time::Instant;
-use std::collections::HashMap;
-use enclave_sgx::*;
-use consensus_state::*;
+// use std::collections::HashMap;
+// use enclave_sgx::*;
+// use consensus_state::*;
 use consensus_state_store::ConsensusStateStore;
 use poet2_util;
 use database::config;
 use database::lmdb;
-use database::{DatabaseError, CliError};
+// use database::{DatabaseError, CliError};
+use database::{CliError};
 use settings_view::Poet2SettingsView;
 use fork_resolver;
 
-const DEFAULT_BLOCK_CLAIM_LIMIT:i32 = 250;
+// const DEFAULT_BLOCK_CLAIM_LIMIT:i32 = 250;
 
 pub struct Poet2Engine {
 }
@@ -60,13 +61,13 @@ impl Engine for Poet2Engine {
 
         info!("Started PoET 2 Engine");
         let mut service = Poet2Service::new(service);
-        let mut chain_head = startup_state.chain_head;
+        let chain_head = startup_state.chain_head;
         let mut published_at_height = false;
         let mut start = Instant::now();
         let validator_id = Vec::from(startup_state.local_peer_info.peer_id);
-        let mut block_num_id_map:HashMap<u64, BlockId> = HashMap::new();
-        let mut block_num:u64 = 0;
-        let mut ctx = create_context().unwrap();
+        // let block_num_id_map:HashMap<u64, BlockId> = HashMap::new();
+        // let block_num:u64 = 0;
+        let ctx = create_context().unwrap();
         let mut state_store = open_statestore(&ctx).unwrap();
 
         service.enclave.initialize_enclave();
@@ -268,33 +269,33 @@ fn verify_wait_certificate( _block: Block) -> bool{
 
 
 //k-test
-fn validtor_has_claimed_block_limit( service: &mut Poet2Service ) -> bool {
+// fn validtor_has_claimed_block_limit( service: &mut Poet2Service ) -> bool {
 
-    let mut block_claim_limit = DEFAULT_BLOCK_CLAIM_LIMIT;
-    let mut key_block_claim_count=9;
-    let mut    poet_public_key="abcd";
-    let mut    validator_info_signup_info_poet_public_key="abcd";
-    //  let mut key_block_claim_limit = poet_settings_view.key_block_claim_limit ;     //key
-    // need to use get_settings from service
-    let key_block_claim_limit = service.get_setting_from_head(
-        String::from("sawtooth.poet.key_block_claim_limit"));
+//     let mut block_claim_limit = DEFAULT_BLOCK_CLAIM_LIMIT;
+//     let mut key_block_claim_count=9;
+//     let mut    poet_public_key="abcd";
+//     let mut    validator_info_signup_info_poet_public_key="abcd";
+//     //  let mut key_block_claim_limit = poet_settings_view.key_block_claim_limit ;     //key
+//     // need to use get_settings from service
+//     let key_block_claim_limit = service.get_setting_from_head(
+//         String::from("sawtooth.poet.key_block_claim_limit"));
 
-    if key_block_claim_limit != "" {
-        block_claim_limit = key_block_claim_limit.parse::<i32>().unwrap();
-    }
+//     if key_block_claim_limit != "" {
+//         block_claim_limit = key_block_claim_limit.parse::<i32>().unwrap();
+//     }
 
-    // let mut validator_state = self.get_validator_state();//                          //stubbed
-    // if validator_state.poet_public_key == validator_info.signup_info.poet_public_key //stubbed
+//     // let mut validator_state = self.get_validator_state();//                          //stubbed
+//     // if validator_state.poet_public_key == validator_info.signup_info.poet_public_key //stubbed
 
-    if poet_public_key == validator_info_signup_info_poet_public_key     //stubbed function replaced with dummy function
-    {
-        //if validator_state.key_block_claim_count >= block_claim_limit
-        if key_block_claim_count >= block_claim_limit{
-            true }
-        else { false }
-    }
-    else{ false }
-}
+//     if poet_public_key == validator_info_signup_info_poet_public_key     //stubbed function replaced with dummy function
+//     {
+//         //if validator_state.key_block_claim_count >= block_claim_limit
+//         if key_block_claim_count >= block_claim_limit{
+//             true }
+//         else { false }
+//     }
+//     else{ false }
+// }
 
 
 //c-test

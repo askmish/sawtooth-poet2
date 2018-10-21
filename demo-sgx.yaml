@@ -31,7 +31,7 @@ services:
         - https_proxy
         - no_proxy
     working_dir: /project/ias_proxy/target/debug/
-    command: "ias_proxy -c dummy-config.toml -vvv"
+    command: "ias_proxy -c dummy-config.toml -vv"
     stop_signal: SIGKILL
 
   validator-1:

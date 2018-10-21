@@ -22,11 +22,11 @@ use futures::future::Future;
 use futures::stream::Stream;
 use hyper::{Body, Client, Error, StatusCode};
 use hyper::client::{HttpConnector, ResponseFuture};
+use hyper::header::HeaderMap;
+use hyper::header::HeaderValue;
 use hyper_tls::HttpsConnector;
 use native_tls::{Certificate, TlsConnector};
 use std::collections::HashMap;
-use hyper::header::HeaderMap;
-use hyper::header::HeaderValue;
 
 /// Get a http and https compatible client to conenct to remote URI
 pub fn get_client(pem_cert: &[u8]) -> Client<HttpsConnector<HttpConnector>, Body> {
@@ -49,7 +49,10 @@ pub fn get_client(pem_cert: &[u8]) -> Client<HttpsConnector<HttpConnector>, Body
 }
 
 /// Return future of body from ResponseFuture
-pub fn read_body_as_string_from_response(response: ResponseFuture, header_param_to_read: Option<&'static str>) -> impl Future<Item=String, Error=Error> {
+pub fn read_body_as_string_from_response(
+    response: ResponseFuture,
+    header_param_to_read: Option<&'static str>
+) -> impl Future<Item=String, Error=Error> {
     response
         .and_then(move |res| {
             if res.status() != StatusCode::OK {
@@ -61,7 +64,11 @@ pub fn read_body_as_string_from_response(response: ResponseFuture, header_param_
 }
 
 /// Read body as string
-pub fn read_body_as_string(body: Body, header_param_to_read: Option<&'static str>, headers: HeaderMap<HeaderValue>) -> impl Future<Item=String, Error=Error> {
+pub fn read_body_as_string(
+    body: Body,
+    header_param_to_read: Option<&'static str>,
+    headers: HeaderMap<HeaderValue>
+) -> impl Future<Item=String, Error=Error> {
     body.fold(Vec::new(), |mut vector, chunk| {
         vector.extend_from_slice(&chunk[..]);
         future::ok::<_, Error>(vector)

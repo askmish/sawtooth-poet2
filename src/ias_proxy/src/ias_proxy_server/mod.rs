@@ -60,13 +60,20 @@ lazy_static! {
     static ref attestation_cache: Mutex<LruCache> = Mutex::new(LruCache::new(None));
 }
 
+static SIG_RL_LINK: &str = "/attestation/sgx/v2/sigrl";
+static AVR_LINK: &str = "/attestation/sgx/v2/report";
+
 impl IasProxyServer {
     /// Create new instance of IasProxyServer
     pub fn new(config_map: HashMap<String, String>) -> Self {
         IasProxyServer {
             ias_proxy_name: config_map["proxy_name"].clone(),
             ias_proxy_port: config_map["proxy_port"].clone(),
-            ias_client: IasClient::new(config_map["ias_url"].clone(), Vec::from(config_map["spid_cert_file"].as_bytes()), None),
+            ias_client: IasClient::new(
+                config_map["ias_url"].clone(),
+                Vec::from(config_map["spid_cert_file"].as_bytes()),
+                None,
+            ),
         }
     }
 
@@ -107,12 +114,12 @@ impl IasProxyServer {
     }
 }
 
-fn respond_to_request(req: Request<Body>, /* sig_rl_cache: &LruCache, attestation_cache: &LruCache, */ias_client_obj: &ias_client::IasClient) -> ResponseBox {
+fn respond_to_request(req: Request<Body>, ias_client_obj: &ias_client::IasClient) -> ResponseBox {
     let path = req.uri().path().to_owned();
     let response = match *req.method() {
         // handle get request from the proxy
         Method::GET =>
-            if path.contains("/attestation/sgx/v2/sigrl") {
+            if path.contains(SIG_RL_LINK) {
                 let cached = sig_rl_cache.lock().unwrap().get(path.clone());
                 match cached {
                     Some(cache_content) => {
@@ -139,7 +146,7 @@ fn respond_to_request(req: Request<Body>, /* sig_rl_cache: &LruCache, attestatio
                 send_response(404, None, None)
             },
         Method::POST =>
-            if req.uri().path().contains("/attestation/sgx/v2/report") {
+            if req.uri().path().contains(AVR_LINK) {
                 // read json input data
                 let read_body_future = ias_client::client_utils::read_body_as_string(req.into_body(), None, HeaderMap::new());
                 let mut runner = Core::new().unwrap();

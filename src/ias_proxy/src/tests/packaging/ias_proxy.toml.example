@@ -40,5 +40,3 @@ ias_url = 'https://test-as.sgx.trustedservices.intel.com:443'
 # submitted to Intel in order to obtain a SPID
 
 spid_cert_file = '/full/path/to/certificate.pem'
-
-# server_name is the

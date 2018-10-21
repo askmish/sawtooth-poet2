@@ -28,9 +28,9 @@
 
 *.batch
 
-src/ias_client/target/**
-src/ias_proxy/target/**
+src/ias_client/target/
+src/ias_proxy/target/
 *.lock
 
-src/build/*
-src/sgx/rust_sgxffi/target/*
+src/build/
+src/sgx/rust_sgxffi/target/

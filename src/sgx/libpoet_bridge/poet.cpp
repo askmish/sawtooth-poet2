@@ -331,6 +331,7 @@ poet_err_t Poet_SetSignatureRevocationList(
     }
 
     return ret;
+
 } // Poet_SetSignatureRevocationList
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX

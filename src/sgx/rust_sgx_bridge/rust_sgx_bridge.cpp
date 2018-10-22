@@ -48,9 +48,12 @@ int r_initialize_enclave(r_sgx_enclave_id_t *eid, const char * enclave_path,
         eid->handle = (intptr_t)poet_enclave_id;
         eid->mr_enclave = (char *)poet_enclave_id->mr_enclave.c_str();
         eid->basename = (char *)poet_enclave_id->basename.c_str();
-    } catch( sawtooth::poet::PoetError& e) {   
+    } catch( sawtooth::poet::PoetError& e) {
+        return -1;
+    }catch(...) {
         return -1;
     }
+
     return 0;
 }
 
@@ -69,25 +72,54 @@ int r_get_epid_group(r_sgx_enclave_id_t *eid, r_sgx_epid_group_t *epid_group) {
     if (!eid) {
         return -1;
     }
-    if(eid->handle == 0) {
+    if (eid->handle == 0) {
         return -1;
     }
     StringBuffer epidBuffer(Poet_GetEpidGroupSize());
-    poet_err_t ret = Poet_GetEpidGroup(epidBuffer.data(), epidBuffer.length);
-    epid_group->epid = epidBuffer.data();
-    printf("\nepid_group in bridge = %s\n", epid_group->epid);
-    return ret;
+    try {
+        poet_err_t ret = Poet_GetEpidGroup(epidBuffer.data(), epidBuffer.length);
+        if(ret != POET_SUCCESS) {
+            return -1;
+        }
+        epid_group->epid = epidBuffer.data();
+    } catch( sawtooth::poet::PoetError& e) {
+        return -1;
+    }catch(...) {
+        return -1;
+    }
+    
+    return 0;
  }
 
 bool r_is_sgx_simulator(r_sgx_enclave_id_t *eid) {
     if (!eid) {
         return -1;
     }
-    if(eid->handle == 0) {
+    if (eid->handle == 0) {
         return -1;
     }
     bool is_simulator = _is_sgx_simulator();
     return is_simulator;
+}
+
+int r_set_signature_revocation_list(r_sgx_enclave_id_t *eid, const char *sig_revocation_list) {
+    if (!eid) {
+        return -1;
+    }
+    if (eid->handle == 0) {
+        return -1;
+    }
+    try {
+        poet_err_t ret = Poet_SetSignatureRevocationList(sig_revocation_list);
+        if(ret != POET_SUCCESS) {
+            return -1;
+        }
+    } catch( sawtooth::poet::PoetError& e) {
+        return -1;
+    } catch(...) {
+        return -1;
+    }
+    return 0;
 }
 
 int r_create_signup_info(r_sgx_enclave_id_t *eid, const char *opk_hash, 

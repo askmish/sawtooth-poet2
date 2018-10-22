@@ -22,7 +22,6 @@ mod tests {
     use super::*;
     use std::str;
     use std::os::raw::c_char;
-    use std::ffi::CStr;
     use ffi::r_sgx_enclave_id_t;
     use ffi::r_sgx_signup_info_t;       
     use ffi::r_sgx_wait_certificate_t;
@@ -48,7 +47,7 @@ mod tests {
         lib_path.push("../../build/bin/libpoet_enclave.signed.so");
         let bin_path = &lib_path.into_os_string().into_string().unwrap();
 
-        let ret = ffi::init_enclave(&mut eid, bin_path, spid_str).unwrap();
+        let ret = ffi::init_enclave(&mut eid, bin_path, spid_str).expect("Enclave initialization failed. wrong path");
         assert_eq!(ret, "Success");
         
         let ret = ffi::free_enclave(&mut eid).unwrap();
@@ -70,27 +69,19 @@ mod tests {
         lib_path.push("../../build/bin/libpoet_enclave.signed.so");
         let bin_path = &lib_path.into_os_string().into_string().unwrap();
 
-        let ret = ffi::init_enclave(&mut eid, bin_path, spid_str).unwrap();
+        let ret = ffi::init_enclave(&mut eid, bin_path, spid_str).expect("Failed to initialize enclave");
         assert_eq!(ret, "Success");
-
-        //Enclave Parameters for IAS operations
-        let mr_enclave = ffi::create_string_from_char_ptr(eid.mr_enclave as *mut c_char);
-        let enclave_basename = ffi::create_string_from_char_ptr(eid.basename as *mut c_char);
-        println!("enclave basename = {:?}", mr_enclave);
-        println!("enclave measurement = {:?}", enclave_basename);
-
+        
         let mut epid_info:r_sgx_epid_group_t = r_sgx_epid_group_t { epid: 0 as *mut c_char};
-        let ret = ffi::get_epid_group(&mut eid, &mut epid_info).unwrap();
+        let ret = ffi::get_epid_group(&mut eid, &mut epid_info).expect("Failed to get EPID group");
 
         assert_eq!(ret, "Success");
-
-        let epid = ffi::create_string_from_char_ptr(epid_info.epid);
-        println!("EPID group = {:?}", epid);
 
         //check if SGX is running in simulator mode
         let is_simulator = ffi::is_sgx_simulator(&mut eid);
         println!("is_sgx_simulator ? {:?}", is_simulator);
 
+        //Create signup info
         let opk_hash_vec = "ABCD" ;
         let mut signup_info:r_sgx_signup_info_t
                                              = r_sgx_signup_info_t {handle:0,
@@ -105,13 +96,11 @@ mod tests {
         let ppk_str: String = ffi::create_string_from_char_ptr(signup_info.poet_public_key as *mut c_char);
         println!("Poet Public Key : {}", ppk_str);
 
-        let quote: String = ffi::create_string_from_char_ptr(signup_info.enclave_quote as *mut c_char);
-        println!("Enclave quote : {}", quote);
-
+        //Create wait certificate
         let mut duration: u64 = 0x0102030405060708;
-        let mut prev_cert = "";
+        let prev_cert = "";
         let prev_block_id = "abc";
-        let mut prev_wait_cert_sig = "";
+        let prev_wait_cert_sig = "";
         let validator_id = "123";
         let block_summary = "this is first block";
         let wait_time = 10_u64;

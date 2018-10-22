@@ -97,7 +97,8 @@ impl EnclaveConfig {
 
         let bin_path = &lib_path.into_os_string().into_string().unwrap();
     	
-        ffi::init_enclave(&mut eid, bin_path, spid_str).unwrap();        
+        ffi::init_enclave(&mut eid, bin_path, spid_str)
+			  .expect("Failed to initialize enclave");        
         info!("Initialized enclave");
 
     	self.enclave_id.handle = eid.handle;
@@ -112,7 +113,7 @@ impl EnclaveConfig {
         info!("creating signup_info");
 
         ffi::create_signup_info(&mut eid, 
-                                &(poet2_util::to_hex_string(pub_key_hash.to_vec())), 
+                                &(poet2_util::to_hex_string(pub_key_hash.to_vec())),
                                 &mut signup).unwrap();         
 
         self.signup_info.handle = signup.handle;
@@ -187,15 +188,17 @@ impl EnclaveConfig {
         -> bool
     {
         let mut eid:r_sgx_enclave_id_t =  eid;
-        let ret = ffi::verify_wait_certificate(&mut eid, &wait_cert.as_str(), &wait_cert_sign.as_str(), &poet_pub_key.as_str());
-        println!("status {:?}", ret);
+        let ret = ffi::verify_wait_certificate(&mut eid, &wait_cert.as_str(),
+                            &wait_cert_sign.as_str(), &poet_pub_key.as_str());
         ret
     }
 
     pub fn get_epid_group(&mut self) ->String {
         let mut eid:r_sgx_enclave_id_t = self.enclave_id;
-        let mut epid_info:r_sgx_epid_group_t = r_sgx_epid_group_t {epid : 0 as *mut c_char};
-        let ret = ffi::get_epid_group(&mut eid, &mut epid_info).unwrap();
+        let mut epid_info:r_sgx_epid_group_t = r_sgx_epid_group_t {
+                                                    epid : 0 as *mut c_char};
+        let ret = ffi::get_epid_group(&mut eid, &mut epid_info)
+                                     .expect("Failed to get EPID group");
 
         let epid = ffi::create_string_from_char_ptr(epid_info.epid);
         debug!("EPID group = {:?}", epid);
@@ -209,10 +212,20 @@ impl EnclaveConfig {
         is_sgx_simulator
     }
 
+    pub fn set_sig_revocation_list(&mut self, sig_rev_list: &String) {
+        let mut eid:r_sgx_enclave_id_t = self.enclave_id;
+        let ret = ffi::set_sig_revocation_list(&mut eid, 
+                                      &sig_rev_list.as_str())
+                                .expect("Failed to set sig revocation list");
+        debug!("Signature revocation list has been updated");
+    }
+
     pub fn get_signup_parameters(&mut self) ->(String, String) {
         let mut signup_data:r_sgx_signup_info_t = self.signup_info;
-        let poet_pub_key = ffi::create_string_from_char_ptr(signup_data.poet_public_key as *mut c_char);
-        let enclave_quote = ffi::create_string_from_char_ptr(signup_data.enclave_quote as *mut c_char);
+        let poet_pub_key = ffi::create_string_from_char_ptr(
+                                  signup_data.poet_public_key as *mut c_char);
+        let enclave_quote = ffi::create_string_from_char_ptr(
+                                  signup_data.enclave_quote as *mut c_char);
         (poet_pub_key, enclave_quote)
     }
     

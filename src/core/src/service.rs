@@ -304,7 +304,7 @@ impl Poet2Service {
             }
         }
 
-        debug!("wait_cert_verify_status = {:?}", wait_cert_verify_status);
+        info!("Wait Certificate verification {}", if wait_cert_verify_status {"Passed"} else {"Failed"});
         wait_cert_verify_status
     }
 }

@@ -73,7 +73,11 @@ impl Engine for Poet2Engine {
 
         let (poet_pub_key, enclave_quote) = service.enclave.get_signup_parameters();
 
-        let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id, &poet_pub_key));
+        debug!("Signup info parameters: poet_pub_key = {}, enclave_quote = {}",
+                                                poet_pub_key, enclave_quote);
+
+        let mut wait_time = Duration::from_secs(service.get_wait_time(
+                                chain_head.clone(), &validator_id, &poet_pub_key));
         let mut prev_wait_time = 0;
 
         let mut poet2_settings_view = Poet2SettingsView::new();
@@ -130,7 +134,9 @@ impl Engine for Poet2Engine {
                             is_published_at_height = false;
                             start = Instant::now();
                             let chain_head_block = service.get_chain_head();
-                            wait_time = Duration::from_secs(service.get_wait_time(chain_head_block.clone(), &validator_id, &poet_pub_key));
+                            wait_time = Duration::from_secs(service.get_wait_time(
+                                                    chain_head_block.clone(), 
+                                                    &validator_id, &poet_pub_key));
 
                             service.initialize_block(Some(new_chain_head_blockid));
                         },
@@ -195,7 +201,8 @@ impl Engine for Poet2Engine {
 
                 let new_chain_head = service.get_block(new_block_id).unwrap();
                 prev_wait_time = wait_time.as_secs();
-                wait_time = Duration::from_secs(service.get_wait_time(new_chain_head, &validator_id, &poet_pub_key));
+                wait_time = Duration::from_secs(service.get_wait_time(
+                                new_chain_head, &validator_id, &poet_pub_key));
                 info!("New wait time is : {:?}",wait_time);
 
                 is_published_at_height = true;

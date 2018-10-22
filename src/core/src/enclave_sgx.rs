@@ -85,7 +85,8 @@ impl EnclaveConfig {
         let spid_str = str::from_utf8(&spid_vec).unwrap();
 
         let mut lib_path = env::current_dir().unwrap();
-        lib_path.push("../build/bin/libpoet_enclave.signed.so");
+        lib_path.push("/project/sawtooth-poet2/src/build/bin/libpoet_enclave.signed.so");
+        lib_path.push("/usr/lib/libpoet_enclave.signed.so");
         let bin_path = &lib_path.into_os_string().into_string().unwrap();
     	
         ffi::init_enclave(&mut eid, bin_path, spid_str).unwrap();        
@@ -208,4 +209,3 @@ impl EnclaveConfig {
     }
     
 }
-

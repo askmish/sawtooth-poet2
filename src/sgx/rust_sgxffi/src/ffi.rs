@@ -76,6 +76,20 @@ pub fn is_sgx_simulator(eid: &mut r_sgx_enclave_id_t) -> bool {
     }
 }
 
+pub fn set_sig_revocation_list(eid: &mut r_sgx_enclave_id_t, 
+                        sig_rev_list: &str) -> Result<String, String> {
+    unsafe {
+        let eid_ptr = eid as *mut r_sgx_enclave_id_t;
+        let sig_rev_list_cstring =  CString::new(sig_rev_list).unwrap();
+        let sig_revocation_status = r_set_signature_revocation_list(eid_ptr, 
+                                            sig_rev_list_cstring.as_ptr());
+        match sig_revocation_status {
+            0 => Ok("Success".to_string()),
+            _ => Err("Set signature revocation list failed".to_string()),
+        }
+    }
+}
+
 pub fn create_signup_info(eid: &mut r_sgx_enclave_id_t, opk_hash: &str, 
                     signup_info: &mut r_sgx_signup_info_t) -> Result<String,String> {
     unsafe {

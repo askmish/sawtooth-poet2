@@ -69,13 +69,12 @@ int r_get_epid_group(r_sgx_enclave_id_t *eid, r_sgx_epid_group_t *epid_group) {
     if (!eid) {
         return -1;
     }
-    if(eid->handle == 0) {
+    if (eid->handle == 0) {
         return -1;
     }
     StringBuffer epidBuffer(Poet_GetEpidGroupSize());
     poet_err_t ret = Poet_GetEpidGroup(epidBuffer.data(), epidBuffer.length);
     epid_group->epid = epidBuffer.data();
-    printf("\nepid_group in bridge = %s\n", epid_group->epid);
     return ret;
  }
 
@@ -83,11 +82,22 @@ bool r_is_sgx_simulator(r_sgx_enclave_id_t *eid) {
     if (!eid) {
         return -1;
     }
-    if(eid->handle == 0) {
+    if (eid->handle == 0) {
         return -1;
     }
     bool is_simulator = _is_sgx_simulator();
     return is_simulator;
+}
+
+int r_set_signature_revocation_list(r_sgx_enclave_id_t *eid, const char *sig_revocation_list) {
+    if (!eid) {
+        return -1;
+    }
+    if (eid->handle == 0) {
+        return -1;
+    }
+    poet_err_t ret = Poet_SetSignatureRevocationList(sig_revocation_list);
+    return ret;
 }
 
 int r_create_signup_info(r_sgx_enclave_id_t *eid, const char *opk_hash, 

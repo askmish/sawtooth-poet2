@@ -44,6 +44,8 @@ int r_get_epid_group(r_sgx_enclave_id_t *eid, r_sgx_epid_group_t *epid_group);
 
 bool r_is_sgx_simulator(r_sgx_enclave_id_t *eid);
 
+int r_set_signature_revocation_list(r_sgx_enclave_id_t *eid, const char *sig_revocation_list);
+
 int r_create_signup_info(r_sgx_enclave_id_t *eid, const char *opk_hash, 
                         r_sgx_signup_info_t *signup_info);
 

@@ -269,7 +269,7 @@ namespace sawtooth {
                     reinterpret_cast<const uint8_t *>(
                         this->signatureRevocationList.c_str());
             }
-
+            
             uint32_t size;
             ThrowSgxError(sgx_calc_quote_size(pRevocationList, revocationListSize, &size));
             this->quoteSize = size;

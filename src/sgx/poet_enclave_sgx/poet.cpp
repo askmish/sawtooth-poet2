@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include "common.h"
 #include "poet_enclave.h"
+#include "poet.h"
+#include "error.h"
 #include <iostream>
 #include <vector>
 
@@ -33,34 +35,37 @@ Poet::Poet(
     const std::string& spid
     )
 {
+    poet_err_t ret = POET_SUCCESS;
+    try {
+        MyLog(POET_LOG_INFO, "Initializing SGX Poet enclave\n");
+        
+        ret = Poet_Initialize(
+            enclaveModulePath.c_str(),
+            spid.c_str(),
+            MyLog
+            );          
+        ThrowPoetError(ret);
 
-    MyLog(POET_LOG_INFO, "Initializing SGX Poet enclave\n");
-    //MyLogV(POET_LOG_DEBUG, "Data directory: %s\n", dataDirectory.c_str());
-    //MyLogV(POET_LOG_DEBUG, "Enclave path: %s\n", enclaveModulePath.c_str());
-    //MyLogV(POET_LOG_DEBUG, "SPID: %s\n", spid.c_str());
-    
-    poet_err_t ret = Poet_Initialize(
-        enclaveModulePath.c_str(),
-        spid.c_str(),
-        MyLog
-        //PyLog
-        );
-                
-    ThrowPoetError(ret);
-    //MyLog(POET_LOG_WARNING, "SGX PoET enclave initialized.\n");
+        StringBuffer mrEnclaveBuffer(Poet_GetEnclaveMeasurementSize());
+        StringBuffer basenameBuffer(Poet_GetEnclaveBasenameSize());
 
-    StringBuffer mrEnclaveBuffer(Poet_GetEnclaveMeasurementSize());
-    StringBuffer basenameBuffer(Poet_GetEnclaveBasenameSize());
+        ThrowPoetError(
+            Poet_GetEnclaveCharacteristics(
+                mrEnclaveBuffer.data(),
+                mrEnclaveBuffer.length,
+                basenameBuffer.data(),
+                basenameBuffer.length));
 
-    ThrowPoetError(
-        Poet_GetEnclaveCharacteristics(
-            mrEnclaveBuffer.data(),
-            mrEnclaveBuffer.length,
-            basenameBuffer.data(),
-            basenameBuffer.length));
-
-    this->mr_enclave = mrEnclaveBuffer.str();
-    this->basename = basenameBuffer.str();
+        this->mr_enclave = mrEnclaveBuffer.str();
+        this->basename = basenameBuffer.str();
+    } catch( sawtooth::poet::PoetError& e) {
+        MyLog(POET_LOG_INFO, "Exception in enclave initialization\n");
+        ThrowPoetError(ret);
+    } catch(...) {
+        MyLog(POET_LOG_INFO, "Enclave initialization failed\n");
+        ret = POET_ERR_UNKNOWN;
+        ThrowPoetError(ret);
+    }
 } // Poet::Poet
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX

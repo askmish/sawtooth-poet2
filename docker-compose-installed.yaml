@@ -1,0 +1,16 @@
+version: '3.6'
+
+volumes:
+  cargo-registry:
+
+services:
+  poet2-engine:
+    image: sawtooth-poet2-engine:${ISOLATION_ID}
+    build:
+      context: .
+      dockerfile: src/core/Dockerfile-installed
+    volumes:
+      - .:/project/sawtooth-poet2/
+    entrypoint: "bash -c \"\
+        tail -f /dev/null \
+        \""

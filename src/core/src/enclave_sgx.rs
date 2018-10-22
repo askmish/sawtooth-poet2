@@ -200,6 +200,12 @@ impl EnclaveConfig {
         is_sgx_simulator
     }
 
+    pub fn set_sig_revocation_list(&mut self, sig_rev_list: &String) {
+        let mut eid:r_sgx_enclave_id_t = self.enclave_id;
+        let ret = ffi::set_sig_revocation_list(&mut eid, &sig_rev_list.as_str()).unwrap();
+        debug!("Signature revocation list has been updated");
+    }
+
     pub fn get_signup_parameters(&mut self) ->(String, String) {
         let mut signup_data:r_sgx_signup_info_t = self.signup_info;
         let poet_pub_key = ffi::create_string_from_char_ptr(signup_data.poet_public_key as *mut c_char);

@@ -91,6 +91,12 @@ mod tests {
         let is_simulator = ffi::is_sgx_simulator(&mut eid);
         println!("is_sgx_simulator ? {:?}", is_simulator);
 
+        //Set signature revocation list
+        let sig_rev_list = "xyz1234abcd";
+        let ret = ffi::set_sig_revocation_list(&mut eid, &sig_rev_list).unwrap();
+        assert_eq!(ret, "Success");
+
+        //Create signup info
         let opk_hash_vec = "ABCD" ;
         let mut signup_info:r_sgx_signup_info_t
                                              = r_sgx_signup_info_t {handle:0,
@@ -108,6 +114,7 @@ mod tests {
         let quote: String = ffi::create_string_from_char_ptr(signup_info.enclave_quote as *mut c_char);
         println!("Enclave quote : {}", quote);
 
+        //Create wait certificate
         let mut duration: u64 = 0x0102030405060708;
         let mut prev_cert = "";
         let prev_block_id = "abc";

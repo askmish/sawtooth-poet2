@@ -49,9 +49,10 @@ use engine::Poet2Engine;
 use sawtooth_sdk::consensus::{zmq_driver::ZmqDriver};
 
 use std::process;
-use log::LogLevelFilter;
+use log::LevelFilter;
+use log4rs::append::file::FileAppender;
 use log4rs::append::console::ConsoleAppender;
-use log4rs::config::{Appender, Config, Root};
+use log4rs::config::{Appender, Config, Root, Logger};
 use log4rs::encode::pattern::PatternEncoder;
 
 fn main() {
@@ -70,21 +71,33 @@ fn main() {
 
     let console_log_level;
     match matches.occurrences_of("verbose") {
-        0 => console_log_level = LogLevelFilter::Warn,
-        1 => console_log_level = LogLevelFilter::Info,
-        2 => console_log_level = LogLevelFilter::Debug,
-        3 | _ => console_log_level = LogLevelFilter::Trace,
+        0 => console_log_level = LevelFilter::Warn,
+        1 => console_log_level = LevelFilter::Info,
+        2 => console_log_level = LevelFilter::Debug,
+        3 | _ => console_log_level = LevelFilter::Trace,
     }
 
-    let stdout = ConsoleAppender::builder()
+   let stdout = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
             "{h({l:5.5})} | {({M}:{L}):20.20} | {m}{n}",
         )))
         .build();
 
+    let requests = FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+	    "{h({l:5.5})} | {({M}:{L}):20.20} | {m}{n}",
+        )))
+        .build("log/debug.log")
+        .unwrap();
+ 
     let config = Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
-        .build(Root::builder().appender("stdout").build(console_log_level))
+        .appender(Appender::builder().build("requests", Box::new(requests)))
+    	.logger(Logger::builder()
+            .appender("requests")
+            .additive(false)
+            .build("app::requests", LevelFilter::Trace))
+        .build(Root::builder().appender("requests").build(console_log_level))
         .unwrap_or_else(|err| {
             error!("{}", err);
             process::exit(1);

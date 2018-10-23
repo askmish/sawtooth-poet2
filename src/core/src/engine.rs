@@ -56,7 +56,7 @@ impl Engine for Poet2Engine {
         updates: Receiver<Update>,
         service: Box<Service>,
   startup_state: StartupState,
-   ) {
+   ) -> Result<(), Error> {
 
         info!("Started PoET 2 Engine");
         let mut service = Poet2Service::new(service);
@@ -176,7 +176,7 @@ impl Engine for Poet2Engine {
 
                 Err(RecvTimeoutError::Disconnected) => {
                     error!("Disconnected from validator");
-                    break;
+                    return Err(Error::UnknownPeer(format!("Validator got disconnected.")));
                 }
 
                 Err(RecvTimeoutError::Timeout) => {}
@@ -201,8 +201,6 @@ impl Engine for Poet2Engine {
                 info!("New wait time is : {:?}",wait_time);
 
                 published_at_height = true;
-
-
             }
         }
     }

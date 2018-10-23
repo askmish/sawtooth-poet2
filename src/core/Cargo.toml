@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Intel Corporation"]
 
 [dependencies]
-sawtooth_sdk = { git = "https://github.com/hyperledger/sawtooth-core.git" }
+sawtooth_sdk = { git = "https://github.com/hyperledger/sawtooth-core.git", branch = "master" }
 rand = "0.4.2"
 log = "0.4.5"
 log4rs = "0.8.1"

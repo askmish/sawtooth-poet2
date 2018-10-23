@@ -321,6 +321,8 @@ pub fn get_wait_cert_and_signature(block: &Block) -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand;
+    use rand::Rng;
     use std::default::Default;
     use zmq;
     use sawtooth_sdk::consensus::{zmq_service::ZmqService};

@@ -6,8 +6,8 @@ authors = ["Intel Corporation"]
 [dependencies]
 sawtooth_sdk = { git = "https://github.com/hyperledger/sawtooth-core.git" }
 rand = "0.4.2"
-log = "0.3.0"
-log4rs = "0.7.0"
+log = "0.4.5"
+log4rs = "0.8.1"
 protobuf="2.0"
 zmq = { git = "https://github.com/erickt/rust-zmq", branch = "release/v0.8" }
 num = "0.1.42"

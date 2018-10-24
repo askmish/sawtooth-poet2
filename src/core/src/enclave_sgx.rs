@@ -165,7 +165,8 @@ impl EnclaveConfig {
         info!("wait certificate generated is {:?}", wait_cert);
 
         //release wait certificate
-        let status = ffi::release_wait_certificate(&mut eid, &mut wait_cert_info);
+        ffi::release_wait_certificate(&mut eid, &mut wait_cert_info)
+                            .expect("failed to release wait certificate");
 
     	(wait_cert, wait_cert_sign)
     }

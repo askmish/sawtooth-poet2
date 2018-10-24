@@ -15,10 +15,9 @@
  * ------------------------------------------------------------------------------
  */
 
-use protobuf;
 use consensus_state::ConsensusState;
 use sawtooth_sdk::consensus::engine::BlockId;
-use database::lmdb::{LmdbContext, LmdbDatabase};
+use database::lmdb::{LmdbDatabase};
 use database::DatabaseError;
 use bincode::{serialize, deserialize};
 
@@ -57,11 +56,11 @@ impl<'a> ConsensusStateStore<'a> {
     pub fn delete(&mut self, block_id: BlockId) -> Result<(), DatabaseError>{
         let mut writer = self.consensus_state_db.writer()?;
         writer.delete(&Vec::from(block_id))?;
-
         Ok(())
     }
 
-    pub fn put(&mut self, block_id: BlockId, consensus_state: ConsensusState) -> Result<(), DatabaseError>{
+    pub fn put(&mut self, block_id: BlockId, consensus_state: ConsensusState) ->
+            Result<(), DatabaseError>{
         let mut writer = self.consensus_state_db.writer()?;
         let serialized_state = serialize(&consensus_state).map_err(|err| {
             DatabaseError::WriterError(format!("Failed to serialize state: {}", err))

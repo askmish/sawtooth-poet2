@@ -81,7 +81,7 @@ pub fn sha512_from_str(input_value: &str) -> String {
     sha512_calculator.result_str()
 }
 
-// Sends the BatchList to the REST API
+/// Sends the BatchList to the REST API
 pub fn send_to_rest_api(api: &str, raw_bytes: Vec<u8>) -> String {
     let body_length = raw_bytes.len();
     let bytes = Body::from(raw_bytes);
@@ -104,5 +104,51 @@ pub fn send_to_rest_api(api: &str, raw_bytes: Vec<u8>) -> String {
     match runner.run(read_body_as_string_from_response(response, None)) {
         Ok(got_response) => got_response,
         Err(error) => panic!("Unable to read response; More details {}", error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static EXPECTED_FILE_CONTENT:&'static str = "This is expected content from
+The dummy file.";
+
+    #[test]
+    fn test_sha512_from_str() {
+        let sha512_of_validator_tp = "06774ab4d0c0dea67a6fb29dd0fee42d89cf66e0c41f63e7058e77839f18877460f260ad7dc99d12428bb188eaa1ddf87a9d9cf59570de95e9f76773bc190e78";
+        let sha512_calculated = sha512_from_str("validator_registry");
+        assert_eq!(sha512_of_validator_tp, sha512_calculated)
+    }
+
+    #[test]
+    fn test_sha256_from_str() {
+        let sha256_of_validator_tp = "6a437209808cff53912c184ab0d3742d47c601c32367e8c34dbe34e9b923e147";
+        let sha256_calculated = sha256_from_str("validator_registry");
+        assert_eq!(sha256_of_validator_tp, sha256_calculated)
+    }
+
+    #[test]
+    fn test_read_file_as_string() {
+        let what_is_read_from_file = read_file_as_string("src/tests/resources/dummy_file.txt");
+        assert_eq!(EXPECTED_FILE_CONTENT, what_is_read_from_file)
+    }
+
+    #[test]
+    fn test_to_hex_string() {
+        let dummy_string = "This is dummy string";
+        let vec_of_dummy_string = dummy_string.to_string().as_bytes().to_vec();
+        let dummy_string_in_hex = "546869732069732064756d6d7920737472696e67";
+        let what_is_returned_from_fun = to_hex_string(vec_of_dummy_string);
+        assert_eq!(dummy_string_in_hex, what_is_returned_from_fun);
+    }
+
+    #[test]
+    fn test_block_id_to_hex_string() {
+        let dummy_string = "This is dummy string";
+        let vec_of_dummy_string : BlockId = dummy_string.to_string().as_bytes().to_vec();
+        let dummy_string_in_hex = "546869732069732064756d6d7920737472696e67";
+        let what_is_returned_from_fun = blockid_to_hex_string(vec_of_dummy_string);
+        assert_eq!(dummy_string_in_hex, what_is_returned_from_fun);
     }
 }

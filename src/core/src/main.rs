@@ -38,6 +38,8 @@ extern crate hyper;
 extern crate ias_client;
 extern crate tokio_core;
 extern crate toml;
+#[cfg(test)]
+extern crate tokio;
 
 pub mod engine;
 pub mod service;

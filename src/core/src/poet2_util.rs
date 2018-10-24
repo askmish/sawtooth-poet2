@@ -106,3 +106,52 @@ pub fn send_to_rest_api(api: &str, raw_bytes: Vec<u8>) -> String {
         Err(error) => panic!("Unable to read response; More details {}", error),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use hyper::service::service_fn_ok;
+    use hyper::StatusCode;
+    use std::net::Ipv4Addr;
+    use std::net::SocketAddr;
+    use std::net::SocketAddrV4;
+    use std::thread;
+    use tokio::runtime::Runtime;
+    use hyper::Response;
+    use hyper::Server;
+    use hyper::header::HeaderName;
+    use std::str::FromStr;
+    use hyper::rt::Future;
+    use super::*;
+
+    // Variable so that server is not trying to bind again
+    static mut IS_INITIALIZED: bool = false;
+    lazy_static! {
+        static ref random_string: String = "This string is expected in body".to_string();
+    }
+
+    fn mock_setup_server() {
+        unsafe {
+            IS_INITIALIZED = true;
+        }
+        let loopback_addr = Ipv4Addr::new(127, 0, 0, 1);
+        // TODO: Use random port here
+        let socket_addr: SocketAddr = SocketAddr::from(SocketAddrV4::new(loopback_addr, 8080));
+        let new_service = move || {
+            service_fn_ok(|_| {
+                let mut response = Response::new(Body::from(random_string.clone()));
+                response.headers_mut().insert(HeaderName::from_str("header1").unwrap(),
+                                              HeaderValue::from_str("value1").unwrap());
+                response
+            })
+        };
+        let server = Server::bind(&socket_addr)
+            .serve(new_service)
+            .map_err(|e| panic!("server error: {}", e));
+
+        // TODO: Force this thread to close after test case ends
+        thread::spawn(|| {
+            let mut handler = Runtime::new().unwrap();
+            handler.block_on(server).unwrap()
+        });
+    }
+}

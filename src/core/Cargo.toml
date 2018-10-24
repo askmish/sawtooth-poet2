@@ -41,6 +41,9 @@ ias_client = { path = "../ias_client" }
 tokio-core = "0.1.17"
 toml = "0.4.8"
 
+[dev-dependencies]
+tokio = "0.1.11"
+
 [package.metadata.deb]
 assets = [
     ["../../packaging/systemd/poet2.service", "/lib/systemd/system/poet2.service", "644"],

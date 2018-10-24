@@ -36,7 +36,6 @@ extern crate sgxffi;
 
 pub mod engine;
 pub mod service;
-pub mod enclave_sim;
 pub mod enclave_sgx;
 pub mod database;
 pub mod consensus_state;
@@ -67,7 +66,7 @@ fn main() {
 
     let endpoint = matches
         .value_of("connect")
-        .unwrap_or("tcp://localhost:5005");
+        .unwrap_or("tcp://localhost:5050");
 
     let console_log_level;
     match matches.occurrences_of("verbose") {

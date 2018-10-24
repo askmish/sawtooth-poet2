@@ -1,5 +1,5 @@
 [package]
-name = "poet2"
+name = "sawtooth-poet2"
 version = "0.1.0"
 authors = ["Intel Corporation"]
 
@@ -23,9 +23,9 @@ rust_sgxffi = { path = "../sgx/rust_sgxffi"}
 
 [package.metadata.deb]
 assets = [
-    ["../../packaging/systemd/poet2.service", "/lib/systemd/system/poet2.service", "644"],
-    ["../../packaging/systemd/poet2", "/etc/default/poet2", "644"],
-    ["target/release/poet2", "usr/bin/", "755"],
+    ["../../packaging/systemd/sawtooth-poet2.service", "/lib/systemd/system/sawtooth-poet2.service", "644"],
+    ["../../packaging/systemd/sawtooth-poet2", "/etc/default/sawtooth-poet2", "644"],
+    ["target/release/sawtooth-poet2", "usr/bin/", "755"],
     ["../build/bin/librust_sgx_bridge.so", "usr/lib/", "755"],
     ["../build/bin/libsgxffi.so", "usr/lib/", "755"],
     ["/tmp/sgxsdk/lib64/libsgx_capable.so", "usr/lib/", "755"],
@@ -37,3 +37,4 @@ assets = [
     ["../build/bin/libpoet_enclave.signed.so", "usr/lib/", "755"],
     ["../build/lib/libpoet_enclave.so", "usr/lib/", "755"],
 ]
+maintainer-scripts = "../../packaging/ubuntu"

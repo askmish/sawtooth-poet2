@@ -81,7 +81,7 @@ services:
       - validator-1
     entrypoint: "bash -c \"\
         source /project/sawtooth-poet2/build_sgx_binary.sh \
-        && RUST_BACKTRACE=1 cargo run --bin poet2 -- -C tcp://validator-1:5050 -v \""
+        && RUST_BACKTRACE=1 cargo run --bin sawtooth-poet2 -- -C tcp://validator-1:5050 -v \""
     stop_signal: SIGKILL
 
   rest-api-1:

@@ -64,7 +64,7 @@ node ('master') {
             stage("Archive Build Artifacts") {
                 sh 'docker-compose -f copy-debs.yaml up'
                 sh 'docker-compose -f copy-debs.yaml down'
-                archiveArtifacts artifacts: 'poet2*amd64.deb'
+                archiveArtifacts artifacts: 'sawtooth-poet2*amd64.deb'
             }
         }
     }

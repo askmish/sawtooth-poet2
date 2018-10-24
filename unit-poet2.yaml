@@ -21,7 +21,7 @@ services:
     container_name: poet2-test
     build:
       context: ./
-      dockerfile: ./poet2-engine.dockerfile
+      dockerfile: ./poet2-sgx-engine.dockerfile
       args:
         - http_proxy
         - https_proxy

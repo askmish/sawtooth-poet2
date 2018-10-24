@@ -88,18 +88,16 @@ impl IasProxyServer {
         };
         let ias_client = self.ias_client.clone();
         // TODO: Store this server instance and call shutdown
-        // TODO: Solve below error (logic error) using mutex
         let new_service = move || {
             let ias_client = ias_client.clone();
             service_fn(move |req|
-                respond_to_request(req, /*&sig_rl_cache, &attestation_cache, */&ias_client)
+                respond_to_request(req, &ias_client)
             )
         };
         let server = Server::bind(&socket_addr).serve(new_service);
         hyper::rt::run(server.map_err(|e| {
             panic!("Server error: {}", e);
         }));
-        // Note: This should also be doing a proxy job
         // signed rl cache from the LruCache(), attestation cache from the LruCache()
         // If get request when listening and it's for '/attestation/sgx/v2/sigrl' then get proxy
         // If post request when listening and it's for '/attestation/sgx/v2/report' then post proxy

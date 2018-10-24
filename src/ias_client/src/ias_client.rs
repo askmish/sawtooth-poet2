@@ -25,6 +25,11 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate tokio_core;
+#[cfg(test)]
+extern crate tokio;
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
 
 // What are the things used from those external crates
 use client_utils::get_client;
@@ -37,8 +42,6 @@ use tokio_core::reactor::Core;
 
 // modules defined in this crate
 pub mod client_utils;
-#[cfg(test)]
-pub mod tests;
 
 /// structure for storing IAS connection information
 #[derive(Debug, Clone)]
@@ -169,4 +172,50 @@ impl IasClient {
             Err(error) => panic!("Unable to read response; More details {}", error),
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static DEFAULT_DURATION: u64 = 300;
+    static DUMMY_DURATION: u64 = 0;
+    lazy_static! {
+        static ref default_url: &'static str = "";
+        static ref dummy_url: &'static str = "dummy.url";
+        static ref default_cert: Vec<u8> = [].to_vec();
+        static ref dummy_cert: Vec<u8> = "random_byte_contents".as_bytes().to_vec();
+    }
+
+    #[test]
+    fn test_default_ias_client_creation() {
+        let default_client = IasClient::default();
+        assert_eq!(default_client.ias_url, default_url.clone());
+        assert_eq!(default_client.spid_cert_file.len(), default_cert.len());
+        assert_eq!(default_client.timeout.as_secs(), DEFAULT_DURATION);
+    }
+
+    #[test]
+    fn test_new_ias_client_creation() {
+        let new_ias_client = IasClient::new(
+            dummy_url.clone().to_string(),
+            dummy_cert.clone(),
+            Option::from(DUMMY_DURATION));
+        assert_eq!(new_ias_client.ias_url, dummy_url.clone());
+        assert_eq!(new_ias_client.spid_cert_file.len(), dummy_cert.len());
+        assert_eq!(new_ias_client.timeout.as_secs(), DUMMY_DURATION);
+    }
+
+    #[test]
+    fn test_new_ias_client_with_assignment() {
+        let mut default_client = IasClient::default();
+        *default_client.ias_url_mut() = dummy_url.clone().to_string();
+        *default_client.spid_cert_file_mut() = dummy_cert.clone();
+        *default_client.timeout_mut() = Duration::new(DUMMY_DURATION, 0);
+        assert_eq!(default_client.ias_url, dummy_url.clone());
+        assert_eq!(default_client.spid_cert_file.len(), dummy_cert.len());
+        assert_eq!(default_client.timeout.as_secs(), DUMMY_DURATION);
+    }
+    // Reading from response / body, reading of headers are handled in client_utils.rs
+    // Please find the file for unit tests on those
 }

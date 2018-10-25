@@ -54,12 +54,26 @@ use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Config, Root, Logger};
 use log4rs::encode::pattern::PatternEncoder;
 
+/*
+ *
+ * This is the main() method.
+ *
+ * This is where we parse the command-line args and 
+ * setup important parameters like:
+ * - endpoint url of validator
+ * - verbosity of logging
+ * - initiate the zmq driver connection at the "endpoint"
+ * - start the poet2 engine/logic code
+ *
+ * @params None
+ *
+ */
 fn main() {
-	 let matches = clap_app!(intkey =>
+    let matches = clap_app!(sawtooth-poet2 =>
         (version: crate_version!())
-        (about: "PoET Consensus Engine 2")
+        (about: "PoET 2 Consensus Engine")
         (@arg connect: -C --connect +takes_value
-         "connection endpoint for validator")
+         "connection endpoint url for validator")
         (@arg verbose: -v --verbose +multiple
          "increase output verbosity"))
         .get_matches();
@@ -84,18 +98,18 @@ fn main() {
 
     let requests = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-	    "{h({l:5.5})} | {({M}:{L}):20.20} | {m}{n}",
+        "{h({l:5.5})} | {({M}:{L}):20.20} | {m}{n}",
         )))
         .build("log/debug.log")
-        .unwrap();
- 
+       .unwrap();
+
     let config = Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
         .appender(Appender::builder().build("requests", Box::new(requests)))
-    	.logger(Logger::builder()
-            .appender("requests")
-            .additive(false)
-            .build("app::requests", LevelFilter::Trace))
+        .logger(Logger::builder()
+        .appender("requests")
+        .additive(false)
+        .build("app::requests", LevelFilter::Trace))
         .build(Root::builder().appender("requests").build(console_log_level))
         .unwrap_or_else(|err| {
             error!("{}", err);
@@ -106,10 +120,10 @@ fn main() {
         error!("{}", err);
         process::exit(1);
     });
-    
+
     let (driver, _stop_handle) = ZmqDriver::new();
-	info!("Starting the ZMQ Driver.");
-	
+    info!("Starting the ZMQ Driver.");
+
     driver.start(&endpoint, Poet2Engine::new()).unwrap_or_else(|_err| {
         process::exit(1);
     });

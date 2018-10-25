@@ -81,7 +81,7 @@ pub fn sha512_from_str(input_value: &str) -> String {
     sha512_calculator.result_str()
 }
 
-// Sends the BatchList to the REST API
+/// Sends the BatchList to the REST API
 pub fn send_to_rest_api(api: &str, raw_bytes: Vec<u8>) -> String {
     let body_length = raw_bytes.len();
     let bytes = Body::from(raw_bytes);
@@ -109,49 +109,28 @@ pub fn send_to_rest_api(api: &str, raw_bytes: Vec<u8>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use hyper::service::service_fn_ok;
-    use hyper::StatusCode;
-    use std::net::Ipv4Addr;
-    use std::net::SocketAddr;
-    use std::net::SocketAddrV4;
-    use std::thread;
-    use tokio::runtime::Runtime;
-    use hyper::Response;
-    use hyper::Server;
-    use hyper::header::HeaderName;
-    use std::str::FromStr;
-    use hyper::rt::Future;
     use super::*;
 
-    // Variable so that server is not trying to bind again
-    static mut IS_INITIALIZED: bool = false;
-    lazy_static! {
-        static ref random_string: String = "This string is expected in body".to_string();
+    static EXPECTED_FILE_CONTENT:&'static str = "This is expected content from
+The dummy file.";
+
+    #[test]
+    fn test_sha512_from_str() {
+        let sha512_of_validator_tp = "06774ab4d0c0dea67a6fb29dd0fee42d89cf66e0c41f63e7058e77839f18877460f260ad7dc99d12428bb188eaa1ddf87a9d9cf59570de95e9f76773bc190e78";
+        let sha512_calculated = sha512_from_str("validator_registry");
+        assert_eq!(sha512_of_validator_tp, sha512_calculated)
     }
 
-    fn mock_setup_server() {
-        unsafe {
-            IS_INITIALIZED = true;
-        }
-        let loopback_addr = Ipv4Addr::new(127, 0, 0, 1);
-        // TODO: Use random port here
-        let socket_addr: SocketAddr = SocketAddr::from(SocketAddrV4::new(loopback_addr, 8080));
-        let new_service = move || {
-            service_fn_ok(|_| {
-                let mut response = Response::new(Body::from(random_string.clone()));
-                response.headers_mut().insert(HeaderName::from_str("header1").unwrap(),
-                                              HeaderValue::from_str("value1").unwrap());
-                response
-            })
-        };
-        let server = Server::bind(&socket_addr)
-            .serve(new_service)
-            .map_err(|e| panic!("server error: {}", e));
+    #[test]
+    fn test_sha256_from_str() {
+        let sha256_of_validator_tp = "6a437209808cff53912c184ab0d3742d47c601c32367e8c34dbe34e9b923e147";
+        let sha256_calculated = sha256_from_str("validator_registry");
+        assert_eq!(sha256_of_validator_tp, sha256_calculated)
+    }
 
-        // TODO: Force this thread to close after test case ends
-        thread::spawn(|| {
-            let mut handler = Runtime::new().unwrap();
-            handler.block_on(server).unwrap()
-        });
+    #[test]
+    fn test_read_file_as_string() {
+        let what_is_read_from_file = read_file_as_string("src/tests/resources/dummy_file.txt");
+        assert_eq!(EXPECTED_FILE_CONTENT, what_is_read_from_file)
     }
 }

@@ -414,8 +414,8 @@ mod tests {
             let mut zmq_svc = ZmqService::new(
                 sender,
                 ::std::time::Duration::from_secs(10),
-                "mock".into(),
-                "0".into(),
+//                "mock".into(),
+//                "0".into(),
             );
             
                 

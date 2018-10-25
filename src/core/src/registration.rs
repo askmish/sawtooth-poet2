@@ -191,3 +191,90 @@ fn get_address_for_setting(setting: &str) -> String {
     // append 16*4 = 64 address with config state namespace
     CONFIGSPACE_NAMESPACE.to_owned() + final_hash.as_str() + setting_part_hash.as_str()
 }
+
+#[cfg(test)]
+mod tests {
+    use sawtooth_sdk::signing::Context;
+    use sawtooth_sdk::signing::secp256k1::Secp256k1Context;
+    use sawtooth_sdk::signing::secp256k1::Secp256k1PrivateKey;
+    use super::*;
+
+    #[test]
+    fn test_get_address_for_setting() {
+        let address_for_setting_pub_key = "000000a87cb5eafdcca6a8dffb873b3b2ce64f97a7d614626e4500e3b0c44298fc1c14";
+        let address_calculated = get_address_for_setting("sawtooth.poet2.report_public_key_pem");
+        assert_eq!(address_for_setting_pub_key, address_calculated);
+    }
+
+    #[test]
+    fn test_get_transaction() {
+        let dummy_transaction_bytes = "dummy bytes".as_bytes();
+        let dummy_payload = "dummy payload";
+        let dummy_signature = "dummy_signature";
+        let transaction = get_transaction(dummy_transaction_bytes, dummy_signature.to_string(),
+                                          dummy_payload.to_string());
+        assert_eq!(transaction.get_header(), dummy_transaction_bytes);
+        assert_eq!(transaction.get_header_signature(), dummy_signature);
+        assert_eq!(transaction.get_payload(), dummy_payload.to_string().as_bytes());
+    }
+
+    #[test]
+    fn test_get_transaction_header() {
+        let dummy_input_addresses = ["dummy input addresses".to_string()];
+        let dummy_output_addresses = ["dummy output addresses".to_string()];
+        let dummy_payload = "dummy payload".to_string();
+        let dummy_nonce = "dummy nonce".to_string();
+        let context = Secp256k1Context::new();
+        let dummy_private_key: Box<PrivateKey> = context.new_random_private_key().unwrap();
+        let signer = Signer::new(&context, dummy_private_key.as_ref());
+        let dummy_public_key = signer.get_public_key().unwrap();
+        let transaction_header = get_transaction_header(&dummy_input_addresses,
+                                                        &dummy_output_addresses, dummy_payload.clone(),
+                                                        dummy_public_key, dummy_nonce.clone());
+        assert_eq!(transaction_header.get_nonce(), dummy_nonce);
+        assert_eq!(transaction_header.get_payload_sha512(), sha512_from_str(dummy_payload.as_str()));
+        assert_eq!(transaction_header.get_nonce(), dummy_nonce);
+    }
+
+    #[test]
+    fn get_test_batch() {
+        let dummy_transaction_bytes = "dummy bytes".as_bytes();
+        let dummy_payload = "dummy payload";
+        let dummy_signature = "dummy_signature";
+        let transaction = get_transaction(dummy_transaction_bytes, dummy_signature.to_string(),
+                                          dummy_payload.to_string());
+        let context = Secp256k1Context::new();
+        let dummy_private_key: Box<PrivateKey> = context.new_random_private_key().unwrap();
+        let signer1 = Signer::new(&context, dummy_private_key.as_ref());
+        let signer2 = Signer::new(&context, dummy_private_key.as_ref());
+        let batch = get_batch(signer1, transaction.clone());
+        let dummy_public_key = signer2.get_public_key().unwrap();
+        let transaction_ids = vec![transaction.clone()]
+            .iter()
+            .map(|trans| String::from(trans.get_header_signature()))
+            .collect();
+        let mut batch_header = BatchHeader::new();
+        batch_header.set_transaction_ids(RepeatedField::from_vec(transaction_ids));
+        batch_header.set_signer_public_key(dummy_public_key.as_hex());
+        let batch_header_bytes = batch_header.write_to_bytes().unwrap();
+        let signature = signer2.sign(&batch_header_bytes).unwrap();
+        assert_eq!(batch.get_header_signature(), signature);
+    }
+
+    #[test]
+    fn test_get_batch_list() {
+        let dummy_transaction_bytes = "dummy bytes".as_bytes();
+        let dummy_payload = "dummy payload";
+        let dummy_signature = "dummy_signature";
+        let transaction = get_transaction(dummy_transaction_bytes, dummy_signature.to_string(),
+                                          dummy_payload.to_string());
+        let context = Secp256k1Context::new();
+        let dummy_private_key: Box<PrivateKey> = context.new_random_private_key().unwrap();
+        let signer1 = Signer::new(&context, dummy_private_key.as_ref());
+        let signer2 = Signer::new(&context, dummy_private_key.as_ref());
+        let batch1 = get_batch(signer1, transaction.clone());
+        let batch2 = get_batch(signer2, transaction.clone());
+        let batch_list = get_batch_list(batch1);
+        assert_eq!(batch_list.get_batches(), [batch2])
+    }
+}

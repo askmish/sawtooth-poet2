@@ -87,7 +87,7 @@ pub struct TomlConfig {
  *
  */
 fn main() {
-    let matches = clap_app!(sawtooth-poet2 =>
+    let matches = clap_app!(sawtoothpoet2 =>
         (version: crate_version!())
         (about: "PoET 2 Consensus Engine")
         (@arg config: --config +takes_value
@@ -161,10 +161,10 @@ fn main() {
         Err(err) => panic!("Error converting config file: {}", err),
     };
 
-    let (driver, _stop_handle) = ZmqDriver::new();
-    info!("Starting the ZMQ Driver.");
-
-    driver.start(&endpoint, Poet2Engine::new()).unwrap_or_else(|_err| {
-        process::exit(1);
-    });
+//    let (driver, _stop_handle) = ZmqDriver::new();
+//    info!("Starting the ZMQ Driver.");
+//
+//    driver.start(&endpoint, Poet2Engine::new()).unwrap_or_else(|_err| {
+//        process::exit(1);
+//    });
 }

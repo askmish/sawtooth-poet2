@@ -43,7 +43,7 @@ pub fn resolve_fork(service: &mut Poet2Service, state_store: &mut ConsensusState
 
         // Commiting or Resolving fork if one exists
         // Advance the chain if possible.
-        let mut claim_block_dur:u64 = 0_u64;
+        let claim_block_dur:u64;
         claim_block_dur = prev_wait_time;
 
         let new_block_dur = get_cert_from(&block).wait_time;
@@ -68,13 +68,15 @@ pub fn resolve_fork(service: &mut Poet2Service, state_store: &mut ConsensusState
                 state.aggregate_chain_clock = agg_chain_clock;
                 state.estimate_info = EstimateInfo{
                     population_estimate : 0_f64,
-                    previous_block_id   : poet2_util::to_hex_string(Vec::from(block.previous_id.clone())),
+                    previous_block_id   : poet2_util::to_hex_string(Vec::from(
+                      block.previous_id.clone())),
                     validator_id        : poet2_util::to_hex_string(Vec::from(
                       block.signer_id.clone())),
                 };
                 debug!("Storing cummulative cc = {} for blockId : {:?}",
                     agg_chain_clock, block_id.clone());
-                state_store.put(block_id.clone(), state);
+                state_store.put(block_id.clone(), state)
+                           .expect("failed to put into state store");
                 service.set_chain_clock(agg_chain_clock);
                 service.commit_block(block_id);
             }
@@ -97,7 +99,7 @@ pub fn resolve_fork(service: &mut Poet2Service, state_store: &mut ConsensusState
                 let mut fork_cc:u64 = new_block_dur;
                 let mut fork_len:u64 = 1;
                 let mut cc_upto_ancestor = 0_u64;
-                let mut ancestor_found:bool = false;
+                let ancestor_found:bool;
                 info!("Looping over chain to find common ancestor.");
 
                 loop {
@@ -141,12 +143,12 @@ pub fn resolve_fork(service: &mut Poet2Service, state_store: &mut ConsensusState
                     }
                 }
                 let mut fork_won = false;
-                let mut chain_cc:u64 = 0;
+                // let mut chain_cc:u64 = 0;
                 if ancestor_found {
                     info!("Found a common ancestor. Comparing length.");
                     debug!("Chain clocks upto head = {}, upto common ancestor = {}",
                         cc_upto_head, cc_upto_ancestor);
-                    chain_cc = cc_upto_head - cc_upto_ancestor;
+                    let chain_cc:u64 = cc_upto_head - cc_upto_ancestor;
                     let chain_len:u64 = chain_head.block_num - cache_block.block_num;
                     if chain_len > fork_len {
                         fork_won = false;
@@ -165,6 +167,8 @@ pub fn resolve_fork(service: &mut Poet2Service, state_store: &mut ConsensusState
                             fork_won = if fork_cc < chain_cc { true } else { false };
                         }
                     }
+                } else {
+                    info!("Did not find a common ancestor.");
                 }
                 if fork_won {
                     info!("Discarding the block in progress.");
@@ -181,10 +185,13 @@ pub fn resolve_fork(service: &mut Poet2Service, state_store: &mut ConsensusState
                     debug!("Storing cummulative cc = {}", agg_chain_clock);
                     state.estimate_info = EstimateInfo{
                         population_estimate : 0_f64,
-                        previous_block_id   : poet2_util::to_hex_string(Vec::from(block.previous_id.clone())),
-                        validator_id        : poet2_util::to_hex_string(Vec::from(block.signer_id.clone())),
+                        previous_block_id   : poet2_util::to_hex_string(
+                              Vec::from(block.previous_id.clone())),
+                        validator_id        : poet2_util::to_hex_string(
+                              Vec::from(block.signer_id.clone())),
                     };
-                    state_store.put(block_id.clone(), state);
+                    state_store.put(block_id.clone(), state)
+                               .expect("failed to put into state store");
                     service.set_chain_clock(agg_chain_clock);
                     service.commit_block(block_id);
                     // Mark all blocks upto common ancestor
@@ -228,8 +235,10 @@ fn delete_states_upto( ancestor: BlockId, head: BlockId, delete_len: u64,
         }
         else {
             debug!("Deleting state for {:?}", next.clone());
-            state_store.delete(next.clone());
-            next = BlockId::from(state_.unwrap().estimate_info.previous_block_id.as_bytes().to_vec());
+            state_store.delete(next.clone())
+                       .expect("failed to delete from state store");
+            next = BlockId::from(state_.unwrap().
+                    estimate_info.previous_block_id.as_bytes().to_vec());
         }
     }
 }

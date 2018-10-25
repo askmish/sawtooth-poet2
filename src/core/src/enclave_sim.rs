@@ -61,7 +61,7 @@ impl Default for WaitCertificate {
     }
 }
 
-static mut last_block_number : u64 = 0_u64;
+// static mut last_block_number : u64 = 0_u64;
 
 pub struct PoetCertMap {
     poet_block_id : String,
@@ -141,8 +141,7 @@ pub fn initialize_wait_certificate(
     if !in_serialized_prev_block_wait_certificate.is_empty() {
         let deserialized_prev_block_wait_certificate =
                serde_json::from_str(&in_serialized_prev_block_wait_certificate);
-        let mut prev_wait_certificate_obj : WaitCertificate =
-               WaitCertificate::default();
+        let prev_wait_certificate_obj : WaitCertificate;
         
         if deserialized_prev_block_wait_certificate.is_ok() {
             prev_wait_certificate_obj =

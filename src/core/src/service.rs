@@ -74,7 +74,9 @@ impl Poet2Service {
         match blocks {
             Err(err) => {
                 warn!("Could not get a block with id {:?}", block_id.clone());
-                Err(Error::UnknownBlock(format!("Block not found for id {:?}", block_id.clone())))
+                Err(Error::UnknownBlock(format!
+                            ("Block not found for id {:?} error code {:?}", 
+                            block_id.clone(), err)))
             }
             Ok(mut block_map) => {
                 //remove from the returned hashmap to get value
@@ -181,7 +183,7 @@ impl Poet2Service {
     pub fn get_wait_time(&mut self, pre_chain_head: Block, validator_id: &Vec<u8>,
                         poet_pub_key: &String) -> u64
     {
-        let mut duration64: u64 = 0_u64;
+        // let mut duration64: u64 = 0_u64;
         let mut prev_wait_certificate = String::new();
         let mut prev_wait_certificate_sig = String::new();
 

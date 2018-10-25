@@ -263,3 +263,34 @@ fn _get_address( key: &String ) -> String {
     hasher.input(&key.to_string().into_bytes());
     get_validator_registry_prefix() + &hasher.result_str()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_address() {
+        let dummy_string = "This is dummy string";
+        let dummy_string_address = "6a43724a2b2687ff03d12039ab1daa190a9494784977eadc53d464d244647a8fed2e61";
+        let what_is_computed = _get_address(&dummy_string.to_string());
+        assert_eq!(dummy_string_address, what_is_computed);
+    }
+
+    #[test]
+    fn test_get_validator_registry_tp() {
+        let vr_tp_address = "6a4372";
+        let what_is_computed = get_validator_registry_prefix();
+        assert_eq!(vr_tp_address, what_is_computed);
+    }
+
+    #[test]
+    fn test_validatorregistrytransactionhandler() {
+        let vr_ts_hdlr = ValidatorRegistryTransactionHandler::new();
+        let vr_tp_family_name = "validator_registry";
+        let vr_tp_version = "1.0";
+        let vr_tp_address = "6a4372";
+        assert_eq!(vr_ts_hdlr.family_name(), vr_tp_family_name);
+        assert_eq!(vr_ts_hdlr.family_versions(), vec![vr_tp_version]);
+        assert_eq!(vr_ts_hdlr.namespaces(), vec![vr_tp_address]);
+    }
+}

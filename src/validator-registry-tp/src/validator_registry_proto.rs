@@ -100,3 +100,28 @@ impl ValidatorRegistryPayload {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validator_registry_payload() {
+        let vr_payload = "{\
+            \"verb\": \"dummy_verb\",\
+            \"name\": \"dummy_name\",\
+            \"id\": \"dummy_id\",\
+            \"signup_info\": {\
+                \"poet_public_key\": \"dummy_public_key\",\
+                \"proof_data\": \"dummy_proof_data\",\
+                \"anti_sybil_id\": \"dummy_anti_sybil_id\",\
+                \"nonce\": \"dummy_nonce\"\
+            }\
+        }";
+        let dummy_pub_key = "dummy_id".to_string();
+        let vr_payload_obj = ValidatorRegistryPayload::new(vr_payload.as_bytes(), &dummy_pub_key)
+            .unwrap();
+        assert_eq!(vr_payload_obj.get_verb(), "dummy_verb");
+        assert_eq!(vr_payload_obj.get_name(), "dummy_name");
+        assert_eq!(vr_payload_obj.get_id(), "dummy_id");
+    }
+}

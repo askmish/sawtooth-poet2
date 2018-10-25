@@ -38,7 +38,7 @@ use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::pattern::PatternEncoder;
 
 fn main() {
-	 let matches = clap_app!(intkey =>
+	 let matches = clap_app!(validatorregistry =>
         (version: crate_version!())
         (about: "Validator Registry Transaction Processor")
         (@arg connect: -C --connect +takes_value

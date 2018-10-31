@@ -20,11 +20,16 @@ use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 
 use sawtooth_sdk::messages::processor::TpProcessRequest;
+use sawtooth_sdk::messages::setting::{Setting, Setting_Entry};
 use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 use sawtooth_sdk::processor::handler::TransactionHandler;
 
-use validator_registry_proto::*;
+use validator_registry_signup_info::ValidatorRegistrySignupInfo;
+use validator_registry_signup_info::SignupInfoProofData;
+use validator_registry_validator_info::ValidatorRegistryValidatorInfo;
+use validator_registry_payload::ValidatorRegistryPayload;
+use validator_registry_validator_map::*;
 
 use serde_json;
 
@@ -32,25 +37,7 @@ use std::error;
 use std::fmt;
 use std::convert::From;
 use std::collections::HashMap;
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ValidatorRegistryPayload {
-    verb : String,
-    name : String,
-    id   : String,
-    signup_info : SignupInfo,
-}
-
-impl From<String> for ValidatorRegistryPayload {
-    fn from( payload:String ) -> Self {
-        ValidatorRegistryPayload {
-           verb : String::from(""),
-           name : String::from(""),
-           id   : String::from(""),
-           signup_info : SignupInfo::default(),
-        }
-    }
-}
+use protobuf;
 
 #[derive(Debug, Clone)]
 struct ValueError;
@@ -62,10 +49,6 @@ impl fmt::Display for ValueError {
 }
 
 impl error::Error for ValueError {
-    fn description(&self) -> &str {
-        "invalid value found"
-    }
-
     fn cause(&self) -> Option<&error::Error> {
         None
     }
@@ -78,11 +61,10 @@ pub struct ValidatorRegistryTransactionHandler {
 }
 
 impl ValidatorRegistryTransactionHandler {
-    
     pub fn new() -> ValidatorRegistryTransactionHandler {
         ValidatorRegistryTransactionHandler {
             family_name: String::from("validator_registry"),
-            family_versions: vec![String::from("1.0")],
+            family_versions: vec![String::from("2.0")],
             namespaces: vec![String::from(get_validator_registry_prefix().to_string())],
         }
     }         
@@ -106,6 +88,8 @@ impl TransactionHandler for ValidatorRegistryTransactionHandler {
         request: &TpProcessRequest,
         context: &mut TransactionContext,
     ) -> Result<(), ApplyError> {
+
+        // Get txn public key from request header
         let txn_header = &request.header;
         let txn_public_key = match &request.header.as_ref() {
             Some(s) => &s.signer_public_key,
@@ -116,9 +100,11 @@ impl TransactionHandler for ValidatorRegistryTransactionHandler {
             }
         };
 
+        // Extract the validator registry payload from txn request payload
         let val_reg_payload : ValidatorRegistryPayload =
-           ValidatorRegistryPayload::from( String::from_utf8(request.clone().payload)
-           .expect("Found invalid UTF-8"));
+            ValidatorRegistryPayload::new(request.payload.as_slice(), txn_public_key).unwrap();
+
+        // Create the txn public key's hash
         let mut txn_public_key_hasher = Sha256::new();
         txn_public_key_hasher.input(txn_public_key.as_bytes());
         let txn_public_key_hash = txn_public_key_hasher.result_str();
@@ -126,14 +112,16 @@ impl TransactionHandler for ValidatorRegistryTransactionHandler {
         let result = self._verify_signup_info(&txn_public_key_hash, &val_reg_payload, context);
 
         if result.is_ok() {
-            let validator_info = ValidatorInfo {
+            let validator_info = ValidatorRegistryValidatorInfo {
                                     name : val_reg_payload.name.to_owned(),
                                     id : val_reg_payload.id.to_owned(),
-                                    signup_info : val_reg_payload.signup_info.to_owned(),
-                                    txn_id : request.signature.clone(),};
+                                    signup_info : val_reg_payload.get_signup_info().to_owned(),
+                                    txn_id : request.signature.clone(),
+                                 };
+
             if self._update_validator_state(context,
                                 &val_reg_payload.id,
-                                &val_reg_payload.signup_info.anti_sybil_id,
+                                &val_reg_payload.get_signup_info().anti_sybil_id,
                                 &validator_info).is_err(){
                 return Err(ApplyError::InvalidTransaction(
                            String::from("Could not update validator state")));
@@ -149,12 +137,15 @@ impl TransactionHandler for ValidatorRegistryTransactionHandler {
 impl ValidatorRegistryTransactionHandler {
 
     fn _update_validator_state(&self,
-                                     context: &mut TransactionContext,
+                                context: &mut TransactionContext,
                                 validator_id: &String,
-                               anti_sybil_id: &String,
-                              validator_info: &ValidatorInfo,) -> Result <(), ValueError> {
-        let validator_map  : HashMap<String, String> = self._get_validator_map(context);
-        let mut updated_map : HashMap<String, String> = HashMap::new();
+                                anti_sybil_id: &String,
+                                validator_info: &ValidatorRegistryValidatorInfo,)
+                                -> Result <(), ValueError> {
+
+        let validator_map_str : String = self._get_validator_map(context);
+        let mut validator_map : ValidatorRegistryValidatorMap = serde_json::from_str(&validator_map_str).unwrap();
+
         // Clean out old entries in ValidatorInfo and ValidatorMap
         // Protobuf doesn't offer delete item for ValidatorMap so create a new list
         // Use the validator map to find all occurrences of an anti_sybil_id
@@ -164,25 +155,33 @@ impl ValidatorRegistryTransactionHandler {
 
         let mut validator_info_address : String;
 
-        for (key, value) in &validator_map {
-            if anti_sybil_id.to_string() == key.to_string() {
-                validator_info_address = _get_address(value);
+        for entry_str in &mut validator_map.entries {
+            let mut entry : ValidatorRegistryValidatorMapEntry =
+                            serde_json::from_str(&entry_str).unwrap();
+            if anti_sybil_id == &entry.key {
+                // remove the old validator_info data from state
+                validator_info_address = _get_address(&entry.value);
                 self._delete_address(context, &validator_info_address);
-            } else {
-                updated_map.insert(key.to_string(), value.to_string());
+
+                // overwrite the old entry with new data
+                entry.key = anti_sybil_id.to_string();
+                entry.value = validator_id.to_string();
+                entry_str = serde_json::to_string(&entry).unwrap();
+
+                // add the new validator_info to state
+                validator_info_address = _get_address(validator_id);
+                self._set_data(context, &validator_info_address, 
+                                &serde_json::to_string(&validator_info).unwrap());
+
+                break;
             }
         }
 
-        // Add new state entries to ValidatorMap and ValidatorInfo
-        updated_map.insert(anti_sybil_id.to_string(), validator_id.to_string());
-        let validator_map_address = _get_address(&String::from("validator_map"));
+        // Add updated state entries to ValidatorMap
+	let validator_map_address = _get_address(&String::from("validator_map"));
+	self._set_data(context, &validator_map_address, 
+			&serde_json::to_string(&validator_map).unwrap());
 
-        self._set_data(context, &validator_map_address, 
-                                &serde_json::to_string(&updated_map).unwrap());
-
-        validator_info_address = _get_address(validator_id);
-        self._set_data(context, &validator_info_address, 
-                                &serde_json::to_string(&validator_info).unwrap());
         info!("Validator id {} was added to the validator_map and set.",
                 validator_id);
 
@@ -197,43 +196,56 @@ impl ValidatorRegistryTransactionHandler {
         map.insert(address.to_string(), data.as_bytes().to_vec());
         let addresses = context.set_state(map);
         if addresses.is_err(){
-            warn!("Failed to save value address {}",address);
+            warn!("Failed to save value at address {}", address);
         }
     }
 
     fn _verify_signup_info(&self,
-         originator_public_key_hash: &String,
+                    originator_public_key_hash: &String,
                     val_reg_payload: &ValidatorRegistryPayload,
-                            context: &mut TransactionContext,) -> Result <(), ValueError> {
-         //let signup_info = val_reg_payload.signup_info;
+                    context: &mut TransactionContext,) -> Result <(), ValueError> {
+         let signup_info : ValidatorRegistrySignupInfo = serde_json::from_str(val_reg_payload.signup_info_str).unwrap();
+         let proof_data : SignupInfoProofData = serde_json::from_str(&*signup_info.proof_data).unwrap();
+
+         let report_public_key_pem = self._get_config_setting(context, "sawtooth.poet.report_public_key_pem").unwrap();
+         
          Ok(())
     }
 
+    fn _get_setting_data(
+        &self,
+        context : &mut TransactionContext,
+        address: &str,
+    ) -> Result<Option<Vec<u8>>, ApplyError> {
+        context.get_state(vec![address.to_string()]).map_err(|err| {
+            warn!("Internal Error: Failed to load state: {:?}", err);
+            ApplyError::InternalError(format!("Failed to load state: {:?}", err))
+        })
+    }
 
-    fn _get_state( &self, context : &mut TransactionContext,
-                          address : &String,
-                       value_type : &String ) -> String {
+    fn _get_state(&self, context : &mut TransactionContext,
+                         address : &String,) -> String {
 
-        let entries_list_ = context.get_state(vec![address.to_string()]);
-        let entries_list = if entries_list_.is_ok() {
-                                   entries_list_.unwrap()
+        let entries_ = context.get_state(vec![address.to_string()]); // this return Vec<u8>
+        let entries = if entries_.is_ok() {
+                                   entries_.unwrap()
                                } else {
                                   warn!("Could not get context for address : {}", address);
                                   panic!("Error getting context.");
                                };
-        //value_type not being used
-        if entries_list.is_some(){
-            String::from_utf8(entries_list.unwrap()).unwrap()
+
+        if entries.is_some(){
+            String::from_utf8(entries.unwrap()).unwrap()
         } else {
             panic!("Error getting context.");
         }
     }
 
-    fn _get_validator_map( &self,
-                         context : &mut TransactionContext, ) -> HashMap<String, String>{
+    fn _get_validator_map(&self,
+                           context : &mut TransactionContext)
+                           -> String {
         let address = _get_address(&String::from("validator_map"));
-        //_get_state( context, address,String::from("ValidatorMap"))
-        HashMap::new()
+        self._get_state(context, &address, String::from("ValidatorMap"))
     }
 
     fn _delete_address( &self, context : &mut TransactionContext,
@@ -248,10 +260,78 @@ impl ValidatorRegistryTransactionHandler {
             panic!("Error deleting value at address {}.", address.to_string());
         }
     }
+
+    fn _get_config_setting(
+        &self,
+        context: &mut TransactionContext,
+        key : &String,)
+    -> Result<Option<String>, ApplyError> {
+        let config_key_address = _config_key_to_address(&key);
+        let setting_data = self._get_setting_data(context, &config_key_address);
+
+        match setting_data {
+	    None => Ok(None),
+	    Some(entries) => {
+                let setting: Setting = unpack_data(&entries)?;
+                for entry in setting.get_entries().iter() {
+                    if entry.get_key() == key {
+                        return Ok(Some(entry.get_value().to_string()));
+                    }
+                }
+                Ok(None)
+            }
+        }
+    } 
+}
+
+
+fn unpack_data<T>(data: &[u8]) -> Result<T, ApplyError>
+where
+    T: protobuf::Message,
+{
+    protobuf::parse_from_bytes(&data).map_err(|err| {
+        warn!(
+            "Invalid error: Failed to unmarshal SettingsTransaction: {:?}",
+            err
+        );
+        ApplyError::InternalError(format!(
+            "Failed to unmarshal SettingsTransaction: {:?}",
+            err
+        ))
+    })
+}
+
+fn _config_short_hash(input_str: String) -> String {
+    let _CONFIG_ADDRESS_PART_SIZE : usize = 16;
+    let mut hasher =  Sha256::new();
+    hasher.input(input_str.as_bytes());
+    hasher.result_str()[0.._CONFIG_ADDRESS_PART_SIZE].to_string()
+}
+
+fn _config_key_to_address(key : &String) -> String {
+    let _CONFIG_MAX_KEY_PARTS : usize = 4;
+    let _CONFIG_NAMESPACE = "000000".to_string();
+
+    let _CONFIG_ADDRESS_PADDING = _config_short_hash(String::new());
+
+    let key_parts : Vec<&str> = key.split(".").collect();
+    if key_parts.len() != (_CONFIG_MAX_KEY_PARTS - 1) {
+        panic!("Failed to get key parts");
+    }
+
+    let mut addr_parts : Vec<String> = key_parts.iter().map(|key_part| _config_short_hash(key_part.to_string())).collect();
+    let addr_parts_len = addr_parts.len();
+    for i in 0..(_CONFIG_MAX_KEY_PARTS - addr_parts_len) {
+        addr_parts.push(_CONFIG_ADDRESS_PADDING);
+    }
+
+    let addr_parts_str : String = addr_parts.into_iter().collect();
+    let mut config_address = _CONFIG_NAMESPACE.clone();
+    config_address.push_str(&addr_parts_str);
+    config_address
 }
 
 fn get_validator_registry_prefix() -> String {
-
     let mut hasher = Sha256::new();
     hasher.input(b"validator_registry");
     hasher.result_str()[0..6].to_string()
@@ -263,3 +343,4 @@ fn _get_address( key: &String ) -> String {
     hasher.input(&key.to_string().into_bytes());
     get_validator_registry_prefix() + &hasher.result_str()
 }
+

@@ -17,36 +17,31 @@
 
 use sawtooth_sdk::processor::handler::ApplyError;
 use std::str::from_utf8;
+use validator_registry_validator_info::*;
+use validator_registry_signup_info::*;
 use serde_json;
 
 const VALIDATOR_NAME_LEN : usize = 64; 
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
-pub struct SignupInfo {
-    pub poet_public_key : String,
-    pub proof_data : String,
-    pub anti_sybil_id : String,
-    pub nonce :String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
-pub struct ValidatorInfo {
-    pub name : String,
-    pub id : String,
-    pub signup_info : SignupInfo,
-    pub txn_id : String
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ValidatorRegistryPayload {
-    verb : String,
-    name : String,
-    id   : String,
-    signup_info : SignupInfo,
+    // The action that the transaction processor will take. Currently this
+    // is only “register”, but could include other actions in the futures
+    // such as “revoke”
+    pub verb : String,
+
+    // The human readable name of the endpoint
+    pub name : String,
+
+    // Validator's public key (currently using signer_public_key as this is
+    // stored in the transaction header)
+    pub id : String,
+
+    pub signup_info_str : String, //ValidatorRegistrySignupInfo,
 }
 
 impl ValidatorRegistryPayload {
-    pub fn new(payload_data: &[u8], public_key: &String) -> Result<ValidatorRegistryPayload, ApplyError> {
+    pub fn new(payload_data: &[u8], public_key: &str) -> Result<ValidatorRegistryPayload, ApplyError> {
         let payload : ValidatorRegistryPayload;
         let payload_string = match from_utf8(&payload_data) {
             Ok(s) => s,
@@ -95,8 +90,7 @@ impl ValidatorRegistryPayload {
         self.id.clone()
     }
 
-    pub fn get_signup_info(&self) -> SignupInfo {
-        self.signup_info.clone()
+    pub fn get_signup_info(&self) -> ValidatorRegistrySignupInfo {
+        serde_json::from_str(&*self.signup_info_str).unwrap()
     }
 }
-

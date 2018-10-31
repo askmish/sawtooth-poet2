@@ -25,9 +25,13 @@ extern crate log;
 extern crate log4rs;
 extern crate sawtooth_sdk;
 extern crate crypto;
+extern crate protobuf;
 
 pub mod validator_registry_tp;
-pub mod validator_registry_proto;
+pub mod validator_registry_signup_info;
+pub mod validator_registry_payload;
+pub mod validator_registry_validator_info;
+pub mod validator_registry_validator_map;
 
 use sawtooth_sdk::processor::TransactionProcessor;
 use validator_registry_tp::ValidatorRegistryTransactionHandler;

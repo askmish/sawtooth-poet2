@@ -53,7 +53,6 @@ int r_initialize_enclave(r_sgx_enclave_id_t *eid, const char * enclave_path,
     }catch(...) {
         return -1;
     }
-
     return 0;
 }
 
@@ -81,6 +80,7 @@ int r_get_epid_group(r_sgx_enclave_id_t *eid, r_sgx_epid_group_t *epid_group) {
         if(ret != POET_SUCCESS) {
             return -1;
         }
+        
         epid_group->epid = epidBuffer.data();
     } catch( sawtooth::poet::PoetError& e) {
         return -1;

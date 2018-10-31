@@ -58,15 +58,12 @@ Poet::Poet(
 
         this->mr_enclave = mrEnclaveBuffer.str();
         this->basename = basenameBuffer.str();
-    } catch( sawtooth::poet::PoetError& e) {
-        MyLog(POET_LOG_INFO, "Exception in enclave initialization\n");
-        ThrowPoetError(ret);
     } catch(...) {
         MyLog(POET_LOG_INFO, "Enclave initialization failed\n");
         ret = POET_ERR_UNKNOWN;
         ThrowPoetError(ret);
     }
-} // Poet::Poet
+}// Poet::Poet
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 Poet::~Poet()
@@ -92,12 +89,20 @@ Poet* Poet::getInstance(
 std::string Poet::get_epid_group()
 {
     StringBuffer epidGroupBuffer(Poet_GetEpidGroupSize());
-    ThrowPoetError(
+    poet_err_t ret = POET_SUCCESS;
+
+    try {
+        ThrowPoetError(
         Poet_GetEpidGroup(
             epidGroupBuffer.data(),
             epidGroupBuffer.length));
+    } catch(...) {
+        MyLog(POET_LOG_INFO, "Exception in get EPID group\n");
+        ret = POET_ERR_UNKNOWN;
+        ThrowPoetError(ret);
+    }
 
-    return std::string(epidGroupBuffer.str());
+    return std::string(epidGroupBuffer.str());  
 } // Poet::get_epid_group
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -105,6 +110,14 @@ void Poet::set_signature_revocation_list(
     const std::string& signature_revocation_list
     )
 {
-    ThrowPoetError(
-        Poet_SetSignatureRevocationList(signature_revocation_list.c_str()));
+    poet_err_t ret = POET_SUCCESS;
+    try {
+        ThrowPoetError(
+            Poet_SetSignatureRevocationList(signature_revocation_list.c_str()));
+    } catch(...) {
+        MyLog(POET_LOG_INFO, "Exception in set signature revocation list\n");
+        ret = POET_ERR_UNKNOWN;
+        ThrowPoetError(ret);
+    }
 } // Poet::set_signature_revocation_lists
+

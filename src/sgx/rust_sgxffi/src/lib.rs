@@ -47,7 +47,8 @@ mod tests {
         lib_path.push("../../build/bin/libpoet_enclave.signed.so");
         let bin_path = &lib_path.into_os_string().into_string().unwrap();
 
-        let ret = ffi::init_enclave(&mut eid, bin_path, spid_str).expect("Enclave initialization failed. wrong path");
+        let ret = ffi::init_enclave(&mut eid, bin_path, spid_str)
+				.expect("Enclave initialization failed.");
         assert_eq!(ret, "Success");
         
         let ret = ffi::free_enclave(&mut eid).unwrap();
@@ -69,11 +70,13 @@ mod tests {
         lib_path.push("../../build/bin/libpoet_enclave.signed.so");
         let bin_path = &lib_path.into_os_string().into_string().unwrap();
 
-        let ret = ffi::init_enclave(&mut eid, bin_path, spid_str).expect("Failed to initialize enclave");
+        let ret = ffi::init_enclave(&mut eid, bin_path, spid_str)
+                                    .expect("Failed to initialize enclave");
         assert_eq!(ret, "Success");
         
         let mut epid_info:r_sgx_epid_group_t = r_sgx_epid_group_t { epid: 0 as *mut c_char};
-        let ret = ffi::get_epid_group(&mut eid, &mut epid_info).expect("Failed to get EPID group");
+        let ret = ffi::get_epid_group(&mut eid, &mut epid_info)
+                            .expect("Failed to get EPID group");
 
         assert_eq!(ret, "Success");
 

@@ -198,7 +198,7 @@ impl EnclaveConfig {
         let mut epid_info:r_sgx_epid_group_t = r_sgx_epid_group_t {
                                                     epid : 0 as *mut c_char};
         let ret = ffi::get_epid_group(&mut eid, &mut epid_info)
-                                     .expect("Failed to get EPID group");
+                                      .expect("Failed to get EPID group");
 
         let epid = ffi::create_string_from_char_ptr(epid_info.epid);
         debug!("EPID group = {:?}", epid);

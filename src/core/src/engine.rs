@@ -19,26 +19,23 @@ extern crate sawtooth_sdk;
 extern crate log;
 extern crate log4rs;
  
-use sawtooth_sdk::consensus::{engine::*, service::Service};
-use service::Poet2Service;
-use std::sync::mpsc::{Receiver, RecvTimeoutError};
-use std::time;
-use std::str::FromStr;
 use std::cmp;
-use serde_json;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 use std::time::Instant;
-use std::collections::HashMap;
-use enclave_sgx::*;
-use consensus_state::*;
+
+use check_consensus as czk;
 use consensus_state_store::ConsensusStateStore;
-use poet2_util;
 use database::config;
 use database::lmdb;
-use database::{DatabaseError, CliError};
-use settings_view::Poet2SettingsView;
+use database::CliError;
 use fork_resolver;
-use check_consensus as czk;
+use poet2_util;
+use sawtooth_sdk::consensus::{engine::*, service::Service};
+use service::Poet2Service;
+use settings_view::Poet2SettingsView;
 
 pub struct Poet2Engine {
 }
@@ -54,19 +51,22 @@ impl Engine for Poet2Engine {
         &mut self,
         updates: Receiver<Update>,
         service: Box<Service>,
-  startup_state: StartupState,
-   ) -> Result<(), Error> {
+        startup_state: StartupState,
+    ) -> Result<(), Error> {
 
         info!("Started PoET 2 Engine...");
-        let mut service = Poet2Service::new(service);
-        let mut chain_head = startup_state.chain_head;
-        let mut published_at_height = false;
-        let mut start = Instant::now();
+
         let validator_id = Vec::from(startup_state.local_peer_info.peer_id);
-        let mut block_num_id_map:HashMap<u64, BlockId> = HashMap::new();
-        let mut block_num:u64 = 0;
-        let mut ctx = create_context().unwrap();
-        let mut state_store = open_statestore(&ctx).unwrap();
+        let mut chain_head = startup_state.chain_head;
+
+        let mut service = Poet2Service::new(service);
+
+        let mut lmdb_ctx = create_lmdb_context().unwrap();
+        let mut state_store = open_statestore(&lmdb_ctx).unwrap();
+
+        let mut is_published_at_height = false;
+
+        let mut start = Instant::now();
 
         service.enclave.initialize_enclave();
         service.enclave.create_signup_info(&validator_id);
@@ -75,6 +75,7 @@ impl Engine for Poet2Engine {
 
         let mut wait_time =  Duration::from_secs(service.get_wait_time(chain_head.clone(), &validator_id, &poet_pub_key));
         let mut prev_wait_time = 0;
+
         let mut poet2_settings_view = Poet2SettingsView::new();
         poet2_settings_view.init(chain_head.block_id.clone(), &mut service);
 
@@ -106,10 +107,12 @@ impl Engine for Poet2Engine {
                         },
 
                         Update::BlockValid(block_id) => {
-                            let new_block_won = fork_resolver::resolve_fork(&mut service,
-                                &mut state_store, block_id, prev_wait_time,);
+                            let new_block_won = fork_resolver::resolve_fork(
+                                                    &mut service,
+                                                    &mut state_store,
+                                                    block_id, prev_wait_time,);
                             if new_block_won {
-                                published_at_height = true;
+                                is_published_at_height = true;
                             }
                         },
 
@@ -122,11 +125,9 @@ impl Engine for Poet2Engine {
                             );
 
                             service.cancel_block();
-                            info!("Cancelled block in progress.");
 
                             // Need to get wait_time from certificate
-                            // wait_time = service.calculate_wait_time(new_chain_head.clone());
-                            published_at_height = false;
+                            is_published_at_height = false;
                             start = Instant::now();
                             let chain_head_block = service.get_chain_head();
                             wait_time = Duration::from_secs(service.get_wait_time(chain_head_block.clone(), &validator_id, &poet_pub_key));
@@ -179,7 +180,7 @@ impl Engine for Poet2Engine {
                 Err(RecvTimeoutError::Timeout) => {}
             }
 
-            if !published_at_height && Instant::now().duration_since(start) > wait_time {
+            if !is_published_at_height && Instant::now().duration_since(start) > wait_time {
                 let cur_chain_head = service.get_chain_head();
                 info!("Timer expired -- publishing block");
                 debug!("wait time was : {:?} for chain head: {:?}", wait_time, cur_chain_head.clone());
@@ -197,7 +198,7 @@ impl Engine for Poet2Engine {
                 wait_time = Duration::from_secs(service.get_wait_time(new_chain_head, &validator_id, &poet_pub_key));
                 info!("New wait time is : {:?}",wait_time);
 
-                published_at_height = true;
+                is_published_at_height = true;
             }
         }
     }
@@ -211,7 +212,7 @@ impl Engine for Poet2Engine {
     }
 }
 
-fn create_context() -> Result<lmdb::LmdbContext, CliError> {
+fn create_lmdb_context() -> Result<lmdb::LmdbContext, CliError> {
     let path_config = config::get_path_config();
     let statestore_path = &path_config.data_dir.join(config::get_filename());
 

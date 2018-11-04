@@ -38,6 +38,8 @@ extern crate hyper;
 extern crate ias_client;
 extern crate tokio_core;
 extern crate toml;
+#[macro_use]
+extern crate openssl;
 
 pub mod engine;
 pub mod service;
@@ -163,7 +165,7 @@ fn main() {
     let (driver, _stop_handle) = ZmqDriver::new();
     info!("Starting the ZMQ Driver.");
 
-    driver.start(&endpoint, Poet2Engine::new()).unwrap_or_else(|_err| {
+    driver.start(&endpoint, Poet2Engine::new(config)).unwrap_or_else(|_err| {
         process::exit(1);
     });
 }

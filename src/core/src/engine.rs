@@ -25,6 +25,7 @@ use std::str::FromStr;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 use std::time::Instant;
+use std::str::from_utf8;
 
 use check_consensus as czk;
 use consensus_state_store::ConsensusStateStore;

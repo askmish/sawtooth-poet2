@@ -15,10 +15,8 @@
 ------------------------------------------------------------------------------
 */
 
-use core::borrow::BorrowMut;
-use std::collections::HashMap;
 /// module LruCache, for use by IAS proxy
-use std::collections::VecDeque;
+use std::{collections::{HashMap, VecDeque}, borrow::BorrowMut};
 
 #[derive(Debug, Clone)]
 pub struct LruCache {
@@ -74,7 +72,7 @@ impl LruCache {
 mod tests {
     use super::*;
 
-    static DEFAULT_SIZE: usize = 100;
+    const DEFAULT_SIZE: usize = 100;
 
     #[test]
     fn test_default_lru_cache_creation() {

@@ -15,6 +15,7 @@ tokio-core = "0.1.17"
 futures = "0.1.24"
 serde_derive = "1.0.79"
 serde = "1.0"
+log = "0.3.0"
 
 [dev-dependencies]
 tokio = "0.1.11"
@@ -25,7 +26,7 @@ lazy_static="1.1.0"
 name = "ias_client"
 
 # This field points at where the crate is located, relative to the `Cargo.toml`.
-path = "src/ias_client.rs"
+path = "src/lib.rs"
 
 # A flag for enabling unit tests for this target. This is used by `cargo test`.
 test = true

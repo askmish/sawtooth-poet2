@@ -4,8 +4,6 @@ version = "0.1.0"
 authors = ["Intel Corporation"]
 description = "Proxy server for IAS"
 
-# ias_proxy is kept separate, similar to the PoET 1.0 code
-
 [dependencies]
 hyper = "0.12.11"
 tokio-core = "0.1.17"
@@ -35,4 +33,4 @@ test = true
 name = "ias_proxy"
 
 # This field point where the binary can be built (place of main)
-path = "src/ias_proxy.rs"
+path = "src/main.rs"

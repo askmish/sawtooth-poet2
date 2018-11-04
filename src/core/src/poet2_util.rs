@@ -28,6 +28,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use tokio_core::reactor::Core;
+use openssl::{hash::MessageDigest, sign::Verifier, pkey::{PKey, Public}};
 
 const WC_DELIM_CHAR: u8 = '#' as u8; //0x23
 
@@ -105,6 +106,12 @@ pub fn send_to_rest_api(api: &str, raw_bytes: Vec<u8>) -> String {
         Ok(got_response) => got_response,
         Err(error) => panic!("Unable to read response; More details {}", error),
     }
+}
+
+pub fn verify_public_key_sign(pub_key: &PKey<Public>, message: &[u8], signature: &[u8]) -> bool {
+    let mut verifier = Verifier::new(MessageDigest::sha256(), pub_key).unwrap();
+    verifier.update(message);
+    verifier.verify(signature).unwrap()
 }
 
 #[cfg(test)]

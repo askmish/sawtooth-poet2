@@ -15,26 +15,26 @@
 ------------------------------------------------------------------------------
 */
 
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
-use poet2_util::{read_file_as_string, send_to_rest_api, sha256_from_str, sha512_from_str, to_hex_string};
+use poet2_util::{read_file_as_string, send_to_rest_api, sha256_from_str,
+                 sha512_from_str, to_hex_string};
 use protobuf::{Message, RepeatedField};
-use sawtooth_sdk::messages::batch::{Batch, BatchHeader, BatchList};
-use sawtooth_sdk::messages::transaction::{Transaction, TransactionHeader};
-use sawtooth_sdk::signing::{create_context, PrivateKey, PublicKey, Signer};
-use sawtooth_sdk::signing::secp256k1::Secp256k1PrivateKey;
+use sawtooth_sdk::{messages::{batch::{Batch, BatchHeader, BatchList},
+                              transaction::{Transaction, TransactionHeader}},
+                   signing::{create_context, PrivateKey, PublicKey, secp256k1::Secp256k1PrivateKey,
+                             Signer}};
 use serde_json;
 use std::str::from_utf8;
 use validator_proto::{SignupInfo, ValidatorRegistryPayload};
 
-static MAXIMUM_NONCE_SIZE: usize = 32;
-static VALIDATOR_REGISTRY: &str = "validator_registry";
-static VALIDATOR_REGISTRY_VERSION: &str = "1.0";
-static VALIDATOR_MAP: &str = "validator_map";
-static NAMESPACE_ADDRESS_LENGTH: usize = 6;
-static SETTINGS_PART_LENGTH: usize = 16;
-static CONFIGSPACE_NAMESPACE: &str = "000000";
-static PUBLIC_KEY_IDENTIFIER_LENGTH: usize = 8;
+const MAXIMUM_NONCE_SIZE: usize = 32;
+const VALIDATOR_REGISTRY: &str = "validator_registry";
+const VALIDATOR_REGISTRY_VERSION: &str = "1.0";
+const VALIDATOR_MAP: &str = "validator_map";
+const NAMESPACE_ADDRESS_LENGTH: usize = 6;
+const SETTINGS_PART_LENGTH: usize = 16;
+const CONFIGSPACE_NAMESPACE: &str = "000000";
+const PUBLIC_KEY_IDENTIFIER_LENGTH: usize = 8;
+const DEFAULT_VALIDATOR_PRIVATE_KEY: &str = "/etc/sawtooth/keys/validator.priv";
 
 /// This utility generates a validator registry transaction and sends it.
 /// In other words acts as client for validator registry TP.
@@ -42,7 +42,7 @@ pub fn do_register(signer_key: String, block_id: &[u8], signup_info: SignupInfo)
 
     // Default path: /etc/sawtooth/keys/validator.priv
     let read_key = if signer_key.is_empty() {
-        read_file_as_string("/etc/sawtooth/keys/validator.priv")
+        read_file_as_string(DEFAULT_VALIDATOR_PRIVATE_KEY)
     } else {
         read_file_as_string(signer_key.as_str())
     };
@@ -194,9 +194,7 @@ fn get_address_for_setting(setting: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use sawtooth_sdk::signing::Context;
-    use sawtooth_sdk::signing::secp256k1::Secp256k1Context;
-    use sawtooth_sdk::signing::secp256k1::Secp256k1PrivateKey;
+    use sawtooth_sdk::signing::{Context, secp256k1::{Secp256k1Context, Secp256k1PrivateKey}};
     use super::*;
 
     #[test]

@@ -16,28 +16,22 @@
 */
 
 extern crate clap;
-extern crate hyper;
-extern crate ias_client;
-// use the create created for IAS proxy
-extern crate ias_proxy;
+#[macro_use]
+extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate log4rs;
-extern crate serde_json;
-extern crate tokio_core;
-extern crate toml;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
+extern crate toml;
 
 use clap::{App, Arg};
-use log4rs::append::console::ConsoleAppender;
-use log4rs::config::{Appender, Config, Root};
-use log4rs::encode::pattern::PatternEncoder;
+use log4rs::{append::console::ConsoleAppender, config::{Appender, Config, Root}, encode::pattern::PatternEncoder};
 use log::LogLevelFilter;
-use std::fs::File;
-use std::io::Read;
-use std::process;
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File, io::Read, process};
+
+mod ias_proxy_server;
 
 #[derive(Debug, Deserialize)]
 struct TomlConfig {
@@ -130,7 +124,6 @@ fn main() {
     config_map.insert(String::from("proxy_port"), config.proxy_port);
     config_map.insert(String::from("ias_url"), config.ias_url);
     config_map.insert(String::from("spid_cert_file"), config.spid_cert_file);
-    let proxy_server = ias_proxy::ias_proxy_server::get_proxy_server(config_map);
+    let proxy_server = ias_proxy_server::get_proxy_server(config_map);
     proxy_server.run();
 }
-

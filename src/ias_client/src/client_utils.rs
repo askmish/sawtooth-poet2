@@ -15,19 +15,14 @@
 ------------------------------------------------------------------------------
 */
 
-extern crate serde_json;
-#[cfg(test)]
-extern crate tokio_core;
+extern crate hyper_tls;
+extern crate native_tls;
 
-use futures::future;
-use futures::future::Future;
-use futures::stream::Stream;
-use hyper::{Body, Client, Error, StatusCode};
-use hyper::client::{HttpConnector, ResponseFuture};
-use hyper::header::HeaderMap;
-use hyper::header::HeaderValue;
-use hyper_tls::HttpsConnector;
-use native_tls::{Certificate, TlsConnector};
+use futures::{future, future::Future, stream::Stream};
+use hyper::{Body, Client, client::{HttpConnector, ResponseFuture}, Error, header::{HeaderMap, HeaderValue}, StatusCode};
+use self::hyper_tls::HttpsConnector;
+use self::native_tls::{Certificate, TlsConnector};
+use serde_json::to_string;
 use std::collections::HashMap;
 
 /// Get a http and https compatible client to conenct to remote URI
@@ -53,10 +48,11 @@ pub fn get_client(pem_cert: &[u8]) -> Client<HttpsConnector<HttpConnector>, Body
 /// Return future of body from ResponseFuture
 pub fn read_body_as_string_from_response(
     response: ResponseFuture,
-    header_param_to_read: Option<&'static str>
+    header_param_to_read: Option<&'static str>,
 ) -> impl Future<Item=String, Error=Error> {
     response
         .and_then(move |res| {
+            debug!("received attestation result code: {}", res.status());
             if res.status() != StatusCode::OK {
                 // TODO: This should have returned hyper::Error, but we cannot craate that object
                 panic!("Bad Response")
@@ -70,7 +66,7 @@ pub fn read_body_as_string_from_response(
 pub fn read_body_as_string(
     body: Body,
     header_param_to_read: Option<&'static str>,
-    headers: HeaderMap<HeaderValue>
+    headers: HeaderMap<HeaderValue>,
 ) -> impl Future<Item=String, Error=Error> {
     body.fold(Vec::new(), |mut vector, chunk| {
         vector.extend_from_slice(&chunk[..]);
@@ -89,7 +85,7 @@ pub fn read_body_as_string(
                     };
                     map.insert(String::from("body"), body);
                     map.insert(String::from("header"), header_value.to_str().unwrap().to_string());
-                    serde_json::to_string(&map).unwrap()
+                    to_string(&map).unwrap()
                 }
                 _ => body,
             };
@@ -99,25 +95,14 @@ pub fn read_body_as_string(
 
 #[cfg(test)]
 mod tests {
-    use hyper::header::HeaderName;
-    use hyper::HeaderMap;
-    use hyper::Response;
-    use hyper::Server;
-    use hyper::service::service_fn_ok;
-    use hyper::Uri;
-    use std::net::Ipv4Addr;
-    use std::net::SocketAddr;
-    use std::net::SocketAddrV4;
-    use std::str::FromStr;
-    use std::thread;
+    use hyper::{header::HeaderName, Response, Server, service::service_fn_ok, Uri};
+    use std::{net::{Ipv4Addr, SocketAddr, SocketAddrV4}, str::FromStr, thread};
     use super::*;
     use tokio::runtime::Runtime;
     use tokio_core::reactor::Core;
 
     // Variable so that server is not trying to bind again
     static mut IS_INITIALIZED: bool = false;
-    // Variable so error response can be mocked
-    static mut ERROR_RESPONSE: bool = false;
     lazy_static! {
         static ref random_string: String = "This string is expected in body".to_string();
     }
@@ -256,25 +241,15 @@ fL464/eRImnAtIPsDe+bywGUc5mq/EEiJ+90jXP1LAWgUk2Ip5Hl0BeEM34U
 
     #[test]
     #[should_panic]
-    #[ignore]
-    // TODO: For this test to work, need to construct hyper::Error
     fn test_not_ok_read_response_body_with_string() {
-        unsafe {
-            ERROR_RESPONSE = true;
-            if IS_INITIALIZED == false {
-                mock_setup_server();
-            }
-            ERROR_RESPONSE = false;
-        }
+        mock_setup_bad_server();
         let client = Client::new();
-        let address = "http://127.0.0.1:".to_string().to_owned() + "8080";
+        let address = "http://127.0.0.1:".to_string().to_owned() + "8081";
         let future_response = client.get(address.parse::<Uri>().unwrap());
         let mut runner = Core::new().unwrap();
-        let what_is_read_from_response = runner.run(
+        runner.run(
             read_body_as_string_from_response(future_response,
-                                              Option::from("header2"))).unwrap();
-        assert!(what_is_read_from_response.contains(random_string.clone().as_str())
-            && !what_is_read_from_response.contains("value1"))
+                                              None)).unwrap();
     }
 
     fn mock_setup_server() {
@@ -289,11 +264,28 @@ fL464/eRImnAtIPsDe+bywGUc5mq/EEiJ+90jXP1LAWgUk2Ip5Hl0BeEM34U
                 let mut response = Response::new(Body::from(random_string.clone()));
                 response.headers_mut().insert(HeaderName::from_str("header1").unwrap(),
                                               HeaderValue::from_str("value1").unwrap());
-                unsafe {
-                    if ERROR_RESPONSE == true {
-                        *response.status_mut() = StatusCode::from_u16(400).unwrap();
-                    }
-                }
+                response
+            })
+        };
+        let server = Server::bind(&socket_addr)
+            .serve(new_service)
+            .map_err(|e| panic!("server error: {}", e));
+
+        // TODO: Force this thread to close after test case ends
+        thread::spawn(|| {
+            let mut handler = Runtime::new().unwrap();
+            handler.block_on(server).unwrap()
+        });
+    }
+
+    fn mock_setup_bad_server() {
+        let loopback_addr = Ipv4Addr::new(127, 0, 0, 1);
+        // TODO: Use random port here
+        let socket_addr: SocketAddr = SocketAddr::from(SocketAddrV4::new(loopback_addr, 8081));
+        let new_service = move || {
+            service_fn_ok(|_| {
+                let mut response = Response::new(Body::from(random_string.clone()));
+                *response.status_mut() = StatusCode::from_u16(400).unwrap();
                 response
             })
         };

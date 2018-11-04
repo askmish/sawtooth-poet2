@@ -18,23 +18,18 @@
 extern crate futures;
 extern crate hyper;
 extern crate ias_client;
+extern crate ias_proxy;
 extern crate serde;
 extern crate serde_json;
 extern crate tokio_core;
 
-use lru_cache::LruCache;
-use self::futures::Future;
-use self::futures::future;
-use self::hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
-use self::hyper::header::{HeaderMap, HeaderName, HeaderValue};
-use self::hyper::service::service_fn;
-/// module ias_proxy_server, has code to start proxy server
-use self::ias_client::IasClient;
+use self::futures::{Future, future};
+use self::hyper::{Body, Error, header::{HeaderMap, HeaderName, HeaderValue}, Method, Request, Response, Server,
+                  service::service_fn, StatusCode};
+use self::ias_client::ias_client::IasClient;
+use self::ias_proxy::lru_cache::LruCache;
 use self::tokio_core::reactor::Core;
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::sync::Mutex;
+use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Mutex};
 
 type ResponseBox = Box<Future<Item=Response<Body>, Error=Error> + Send>;
 
@@ -60,8 +55,8 @@ lazy_static! {
     static ref attestation_cache: Mutex<LruCache> = Mutex::new(LruCache::new(None));
 }
 
-static SIG_RL_LINK: &str = "/attestation/sgx/v2/sigrl";
-static AVR_LINK: &str = "/attestation/sgx/v2/report";
+const SIG_RL_LINK: &str = "/attestation/sgx/v2/sigrl";
+const AVR_LINK: &str = "/attestation/sgx/v2/report";
 
 impl IasProxyServer {
     /// Create new instance of IasProxyServer
@@ -94,15 +89,11 @@ impl IasProxyServer {
                 respond_to_request(req, &ias_client)
             )
         };
+        // Error case returns 404
         let server = Server::bind(&socket_addr).serve(new_service);
         hyper::rt::run(server.map_err(|e| {
             panic!("Server error: {}", e);
         }));
-        // signed rl cache from the LruCache(), attestation cache from the LruCache()
-        // If get request when listening and it's for '/attestation/sgx/v2/sigrl' then get proxy
-        // If post request when listening and it's for '/attestation/sgx/v2/report' then post proxy
-        // Error case returns 404
-        // Get cached content if it's present otherwise send it to IasClient request for both GET and POST
     }
 
     /// stop to stop listening on the port
@@ -112,7 +103,7 @@ impl IasProxyServer {
     }
 }
 
-fn respond_to_request(req: Request<Body>, ias_client_obj: &ias_client::IasClient) -> ResponseBox {
+fn respond_to_request(req: Request<Body>, ias_client_obj: &IasClient) -> ResponseBox {
     let path = req.uri().path().to_owned();
     let response = match *req.method() {
         // handle get request from the proxy
@@ -207,8 +198,8 @@ fn send_response(status_code: u16, headers: Option<HashMap<String, String>>, bod
 pub fn get_proxy_server(proxy_config: HashMap<String, String>) -> IasProxyServer {
 
     // Read config file from config.get_config_dir()/ias_proxy_server.toml
-    // read proxy_config data from the file
-    // check if file has exactly matching keys - ['proxy_name', 'proxy_port', 'ias_url', 'spid_cert_file']
+    // Conversion to struct would have failed if fields in file doesn't match expectation
+    // So the config map here has all required values set in it
     let ias_server = IasProxyServer::new(proxy_config);
     ias_server
 }

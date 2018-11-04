@@ -16,32 +16,14 @@
 */
 
 // Import section, external crates used are as follows
-extern crate futures;
-extern crate hyper;
-extern crate hyper_tls;
-extern crate native_tls;
 extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
-extern crate tokio_core;
-#[cfg(test)]
-extern crate tokio;
-#[cfg(test)]
-#[macro_use]
-extern crate lazy_static;
 
 // What are the things used from those external crates
-use client_utils::get_client;
-use client_utils::read_body_as_string_from_response;
-use hyper::{Body, Method, Request, Uri};
-use hyper::header::HeaderValue;
-use std::collections::HashMap;
-use std::time::Duration;
+use client_utils::{get_client, read_body_as_string_from_response};
+use hyper::{Body, header, header::HeaderValue, Method, Request, Uri};
+use serde_json::{from_str, to_string};
+use std::{collections::HashMap, str, time::Duration};
 use tokio_core::reactor::Core;
-
-// modules defined in this crate
-pub mod client_utils;
 
 /// structure for storing IAS connection information
 #[derive(Debug, Clone)]
@@ -104,8 +86,8 @@ impl IasClient {
             _ => String::new(),
         };
         let final_path: String = self.ias_url.as_str().to_owned() + &path_computed + &gid_computed;
-        // LOGGER.debug("Fetching SigRL from: %s", url)  Note: url.as_string()
         let url = final_path.parse::<Uri>().unwrap();
+        debug!("Fetching SigRL from: {}", url);
         let client = get_client(self.spid_cert_file.as_slice());
         // TODO: Add logic for request timeout
         let response = client.get(url);
@@ -126,9 +108,9 @@ impl IasClient {
     pub fn post_verify_attestation(&self, quote: &[u8], manifest: Option<&str>, nonce: Option<u64>) -> HashMap<String, String> {
         let final_path: String = self.ias_url.as_str().to_owned() + "/attestation/sgx/v2/report";
         let url = final_path.parse::<Uri>().unwrap();
-        // LOGGER.debug("Posting attestation verification request to: %s", url)
+        debug!("Posting attestation verification request to: {}", url);
         let mut post_json: HashMap<String, String> = HashMap::new();
-        post_json.insert(String::from("isvEnclaveQuote"), std::str::from_utf8(quote).unwrap().to_owned());
+        post_json.insert(String::from("isvEnclaveQuote"), str::from_utf8(quote).unwrap().to_owned());
         match manifest {
             Some(manifest_data) => {
                 post_json.insert(String::from("pseManifest"), manifest_data.to_owned());
@@ -141,28 +123,27 @@ impl IasClient {
             }
             _ => (),
         };
-        let mut req = Request::new(Body::from(serde_json::to_string(&post_json).unwrap()));
+        let mut req = Request::new(Body::from(to_string(&post_json).unwrap()));
         *req.method_mut() = Method::POST;
         *req.uri_mut() = url.clone();
         req.headers_mut().insert(
-            hyper::header::CONTENT_TYPE,
+            header::CONTENT_TYPE,
             HeaderValue::from_static("application/json"),
         );
-        // LOGGER.debug("Posting attestation evidence payload: %s", json)
+        debug!("Posting attestation evidence payload: {:#?}", post_json);
         let client = get_client(self.spid_cert_file.as_slice());
         let response = client.request(req);
-        // LOGGER.debug("received attestation result code: %d", response.status_code)
-        // LOGGER.debug("received attestation result: %s", response.json())
         // TODO: Add logic for request timeout
         let mut runner = Core::new().unwrap();
         match runner.run(read_body_as_string_from_response(response, Option::from("x-iasreport-signature"))) {
             Ok(got_response) => {
-                let deserialized: Result<ReadResponse, _> = serde_json::from_str(got_response.as_str());
+                let deserialized: Result<ReadResponse, _> = from_str(got_response.as_str());
                 let response_to_return = match deserialized {
                     Ok(got_response) => {
                         let mut return_object: HashMap<String, String> = HashMap::new();
                         return_object.insert(String::from("verification_report"), got_response.body.as_str().to_owned());
                         return_object.insert(String::from("signature"), got_response.header.as_str().to_owned());
+                        debug!("received attestation result: {}", return_object.get("verification_report").unwrap());
                         return_object
                     }
                     Err(error) => panic!("Json not encoded properly; More details: {}", error),
@@ -178,42 +159,42 @@ impl IasClient {
 mod tests {
     use super::*;
 
-    static DEFAULT_DURATION: u64 = 300;
-    static DUMMY_DURATION: u64 = 0;
+    const DEFAULT_DURATION: u64 = 300;
+    const DUMMY_DURATION: u64 = 0;
+    const DEFAULT_URL: &str = "";
+    const DUMMY_URL: &str = "dummy.url";
     lazy_static! {
-        static ref default_url: &'static str = "";
-        static ref dummy_url: &'static str = "dummy.url";
-        static ref default_cert: Vec<u8> = [].to_vec();
-        static ref dummy_cert: Vec<u8> = "random_byte_contents".as_bytes().to_vec();
+        static ref DEFAULT_CERT: Vec<u8> = [].to_vec();
+        static ref DUMMY_CERT: Vec<u8> = "random_byte_contents".as_bytes().to_vec();
     }
 
     #[test]
     fn test_default_ias_client_creation() {
         let default_client = IasClient::default();
-        assert_eq!(default_client.ias_url, default_url.clone());
-        assert_eq!(default_client.spid_cert_file.len(), default_cert.len());
+        assert_eq!(default_client.ias_url, DEFAULT_URL.clone());
+        assert_eq!(default_client.spid_cert_file.len(), DEFAULT_CERT.len());
         assert_eq!(default_client.timeout.as_secs(), DEFAULT_DURATION);
     }
 
     #[test]
     fn test_new_ias_client_creation() {
         let new_ias_client = IasClient::new(
-            dummy_url.clone().to_string(),
-            dummy_cert.clone(),
+            DUMMY_URL.clone().to_string(),
+            DUMMY_CERT.clone(),
             Option::from(DUMMY_DURATION));
-        assert_eq!(new_ias_client.ias_url, dummy_url.clone());
-        assert_eq!(new_ias_client.spid_cert_file.len(), dummy_cert.len());
+        assert_eq!(new_ias_client.ias_url, DUMMY_URL.clone());
+        assert_eq!(new_ias_client.spid_cert_file.len(), DUMMY_CERT.len());
         assert_eq!(new_ias_client.timeout.as_secs(), DUMMY_DURATION);
     }
 
     #[test]
     fn test_new_ias_client_with_assignment() {
         let mut default_client = IasClient::default();
-        *default_client.ias_url_mut() = dummy_url.clone().to_string();
-        *default_client.spid_cert_file_mut() = dummy_cert.clone();
+        *default_client.ias_url_mut() = DUMMY_URL.clone().to_string();
+        *default_client.spid_cert_file_mut() = DUMMY_CERT.clone();
         *default_client.timeout_mut() = Duration::new(DUMMY_DURATION, 0);
-        assert_eq!(default_client.ias_url, dummy_url.clone());
-        assert_eq!(default_client.spid_cert_file.len(), dummy_cert.len());
+        assert_eq!(default_client.ias_url, DUMMY_URL.clone());
+        assert_eq!(default_client.spid_cert_file.len(), DUMMY_CERT.len());
         assert_eq!(default_client.timeout.as_secs(), DUMMY_DURATION);
     }
     // Reading from response / body, reading of headers are handled in client_utils.rs

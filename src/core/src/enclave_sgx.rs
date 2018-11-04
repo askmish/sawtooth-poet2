@@ -14,8 +14,9 @@
  * limitations under the License.
  * ------------------------------------------------------------------------------
  */
+extern crate openssl;
 
-use ias_client::IasClient;
+use ias_client::ias_client::IasClient;
 use num::ToPrimitive;
 use poet2_util;
 use serde_json::{from_str, Value};
@@ -28,14 +29,15 @@ use std::env;
 use std::error::Error;
 use std::io;
 use std::os::raw::c_char;
-use std::str;
-use std::string::String;
-use poet2_util;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str;
+use std::string::String;
 use std::vec::Vec;
 use TomlConfig;
 use validator_proto::SignupInfo;
+use openssl::pkey::PKey;
+use poet2_util::verify_public_key_sign;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct WaitCertificate {
@@ -67,6 +69,18 @@ pub struct EnclaveConfig {
     pub signup_info: r_sgx_signup_info_t,
     ias_client: IasClient,
 }
+
+const IAS_REPORT_KEY: &str =
+"-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqXot4OZuphR8nudFrAFi
+aGxxkgma/Es/BA+tbeCTUR106AL1ENcWA4FX3K+E9BBL0/7X5rj5nIgX/R/1ubhk
+KWw9gfqPG3KeAtIdcv/uTO1yXv50vqaPvE1CRChvzdS/ZEBqQ5oVvLTPZ3VEicQj
+lytKgN9cLnxbwtuvLUK7eyRPfJW/ksddOzP8VBBniolYnRCD2jrMRZ8nBM2ZWYwn
+XnwYeOAHV+W9tOhAImwRwKF/95yAsVwd21ryHMJBcGH70qLagZ7Ttyt++qO/6+KA
+XJuKwZqjRlEtSEz8gZQeFfVYgcwSfo96oSMAzVr7V0L6HSDLRnpb6xxmbPdqNol4
+tQIDAQAB
+-----END PUBLIC KEY-----";
+
 
 impl EnclaveConfig {
     pub fn default() -> Self {
@@ -103,15 +117,15 @@ impl EnclaveConfig {
 
         let mut lib_path = env::current_dir().unwrap();
         lib_path.push("../build/bin/libpoet_enclave.signed.so");
-        if ! Path::new(&lib_path).exists(){
+        if !Path::new(&lib_path).exists() {
             lib_path = PathBuf::from("/usr/lib/libpoet_enclave.signed.so");
-            if ! Path::new(&lib_path).exists(){
-                 panic!("There is missing libpoet_enclave.signed.so");
+            if !Path::new(&lib_path).exists() {
+                panic!("There is missing libpoet_enclave.signed.so");
             }
         }
 
         let bin_path = &lib_path.into_os_string().into_string().unwrap();
-    	
+
         ffi::init_enclave(&mut eid, bin_path, spid_str)
 			  .expect("Failed to initialize enclave");        
         info!("Initialized enclave");
@@ -133,7 +147,7 @@ impl EnclaveConfig {
         let mut signup: r_sgx_signup_info_t = self.signup_info;
         info!("creating signup_info");
 
-        ffi::create_signup_info(&mut eid, 
+        ffi::create_signup_info(&mut eid,
                                 &(poet2_util::to_hex_string(pub_key_hash.to_vec())),
                                 &mut signup).unwrap();         
 
@@ -142,10 +156,9 @@ impl EnclaveConfig {
         self.signup_info.poet_public_key_len = signup.poet_public_key_len;
         self.signup_info.enclave_quote = signup.enclave_quote;
 
-        // If not in simulator mode then get attestation verification report
+        // TODO: If not in simulator mode then get attestation verification report
         let (poet_public_key, quote) = self.get_signup_parameters();
         let response = self.ias_client.post_verify_attestation(quote.as_ref(), None, None);
-        // TODO: Check if response has valid contents
         let verification_report = response.get("verification_report").unwrap();
         let signature = response.get("signature").unwrap();
 
@@ -288,8 +301,84 @@ impl EnclaveConfig {
 
 fn check_verification_report(
     verification_report: &String, signature: &String) -> io::Result<()> {
-    // TODO: Perform verification_report signature verification
-    // let public_key = "public key information";
-    // parse verification_report as json response and check if present and not present
+    // First thing we will do is verify the signature over the verification
+    // report. The signature over the verification report uses RSA-SHA256.
+    let public_key = PKey::public_key_from_pem(IAS_REPORT_KEY.as_bytes()).unwrap();
+    if !verify_public_key_sign(&public_key, verification_report.as_bytes(), signature.as_bytes()) {
+        return Err(io::Error::new(
+            io::ErrorKind::Other, "Verification report signature does not match"));
+    }
+
+    // Convert verification_report json into HashMap
+    let verification_report_dict_value: Value = from_str(verification_report).unwrap();
+    let verification_report_dict = verification_report_dict_value.as_object().unwrap();
+    // Verify that the verification report meets the following criteria:
+    // 1. Includes an ID field.
+    if !verification_report_dict.contains_key("id") {
+        return Err(io::Error::new(
+            io::ErrorKind::Other, "AVR does not contain id field"));
+    }
+    // 2. Does not include a revocation reason.
+    if !verification_report_dict.contains_key("revocationReason") {
+        return Err(io::Error::new(
+            io::ErrorKind::Other, "AVR indicates the EPID group has been revoked"));
+    }
+    // 3. Includes an enclave quote status
+    let enclave_status = verification_report_dict.get("isvEnclaveQuoteStatus");
+    if !enclave_status.is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other, "AVR does not include an enclave quote status"));
+    }
+    // 4. Enclave quote status should be "OK".
+    let enclave_quote_status = enclave_status.unwrap().as_str().unwrap();
+    if enclave_quote_status.to_uppercase() != "OK" {
+        // Allow out of date severity issues to pass.
+        if enclave_quote_status.to_uppercase() != "GROUP_OUT_OF_DATE" {
+            error!("Machine requires update (probably BIOS) for SGX compliance.");
+        } else {
+            return Err(io::Error::new(
+            io::ErrorKind::Other, format!("AVR enclave quote status is bad: {}",
+                                          enclave_quote_status)));
+        }
+    }
+    // 5. Includes an enclave quote.
+    if !verification_report_dict.contains_key("isvEnclaveQuoteBody") {
+        return Err(io::Error::new(
+            io::ErrorKind::Other, "AVR does not contain quote body"));
+    }
+    // 6. Includes a PSE manifest status
+    let pse_status = verification_report_dict.get("pseManifestStatus");
+    if !pse_status.is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other, "AVR does not include a PSE manifest status"));
+    }
+    // 7. PSE manifest status should be "OK".
+    let pse_manifest_status = pse_status.unwrap().as_str().unwrap();
+    if pse_manifest_status.to_uppercase() != "OK" {
+        // Allow out of date severity issues to pass.
+        if pse_manifest_status.to_uppercase() != "OUT_OF_DATE" {
+            error!("Machine requires update (probably BIOS) for SGX compliance.");
+        } else {
+            return Err(io::Error::new(
+            io::ErrorKind::Other, format!("AVR PSE manifest status is bad: {}",
+                                          pse_manifest_status)));
+        }
+    }
+    // 8. Includes a PSE manifest hash.
+    if !verification_report_dict.contains_key("pseManifestHash") {
+        return Err(io::Error::new(
+            io::ErrorKind::Other, "AVR does not contain PSE manifest hash"));
+    }
+    // 9. Includes an EPID psuedonym.
+    if !verification_report_dict.contains_key("epidPseudonym") {
+        return Err(io::Error::new(
+            io::ErrorKind::Other, "AVR does not contain an EPID psuedonym"));
+    }
+    // 10. Includes a nonce
+    if !verification_report_dict.contains_key("nonce") {
+        return Err(io::Error::new(
+            io::ErrorKind::Other, "AVR does not contain a nonce"));
+    }
+    // AVR verification done
     Ok(())
 }

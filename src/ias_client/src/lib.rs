@@ -15,5 +15,21 @@
 ------------------------------------------------------------------------------
 */
 
-/// This is library declaration
-pub mod lru_cache;
+// common extern create imports for all modules in this crate
+extern crate futures;
+extern crate hyper;
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
+#[cfg(test)]
+extern crate tokio;
+extern crate tokio_core;
+
+// modules defined in this crate
+pub mod ias_client;
+pub mod client_utils;
